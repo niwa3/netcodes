@@ -97,10 +97,12 @@ TxTracer(Ptr<OutputStreamWrapper> stream, Ptr<const Packet> packet)
   *stream->GetStream() << Simulator::Now().GetNanoSeconds() << " " << packet->GetSize() << std::endl;
 }
 
+/*
 static void
 ServiceTimeTracer(Ptr<OutputStreamWrapper> stream, const Time& time){
   *stream->GetStream() << Simulator::Now().GetNanoSeconds() << " " << time << std::endl;
 }
+*/
 
 int
 main(int argc, char *argv[])
@@ -233,8 +235,6 @@ main(int argc, char *argv[])
   Config::ConnectWithoutContext ("/NodeList/*/ApplicationList/*/$ns3::MyTcpServer/Rx", MakeBoundCallback(&RxTracer, rxStream));
   Ptr<OutputStreamWrapper> txStream = asciiTraceHelper.CreateFileStream("myExample-TxServer.csv");
   Config::ConnectWithoutContext ("/NodeList/*/ApplicationList/*/$ns3::MyTcpServer/Tx", MakeBoundCallback(&TxTracer, txStream));
-  Ptr<OutputStreamWrapper> timeStream = asciiTraceHelper.CreateFileStream("myExample-ServiceTime.csv");
-  Config::ConnectWithoutContext ("/NodeList/*/ApplicationList/*/$ns3::MyTcpServer/ServiceTime", MakeBoundCallback(&ServiceTimeTracer, timeStream));
 
   Simulator::Stop(Seconds(SIM_TIME+5));
   //config.ConfigureAttributes();

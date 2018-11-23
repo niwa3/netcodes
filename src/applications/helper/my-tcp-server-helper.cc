@@ -26,15 +26,27 @@
 
 namespace ns3 {
 
-MyTcpServerHelper::MyTcpServerHelper (std::string protocol, uint32_t pktSize, double meanCalctime, Address address)
+MyTcpServerHelper::MyTcpServerHelper (std::string protocol, uint32_t pktSize, double meanCalctime, Address address, Address nextService)
 {
-  m_factory.SetTypeId ("ns3::MyTcpServer");
-  m_factory.Set ("Protocol", StringValue (protocol));
-  m_factory.Set ("PacketSize", UintegerValue(pktSize));
-  m_factory.Set ("Local", AddressValue (address));
+  m_factory.SetTypeId("ns3::MyTcpServer");
+  m_factory.Set("Protocol", StringValue (protocol));
+  m_factory.Set("PacketSize", UintegerValue(pktSize));
+  m_factory.Set("Local", AddressValue (address));
   std::stringstream calctime;
   calctime << "ns3::ExponentialRandomVariable[Mean="<<meanCalctime<<"]";
-  m_factory.Set ("CalcTime", StringValue (calctime.str()));
+  m_factory.Set("CalcTime", StringValue (calctime.str()));
+  m_factory.Set("NextService", AddressValue(nextService));
+}
+
+MyTcpServerHelper::MyTcpServerHelper (std::string protocol, uint32_t pktSize, double meanCalctime, Address address)
+{
+  m_factory.SetTypeId("ns3::MyTcpServer");
+  m_factory.Set("Protocol", StringValue (protocol));
+  m_factory.Set("PacketSize", UintegerValue(pktSize));
+  m_factory.Set("Local", AddressValue (address));
+  std::stringstream calctime;
+  calctime << "ns3::ExponentialRandomVariable[Mean="<<meanCalctime<<"]";
+  m_factory.Set("CalcTime", StringValue (calctime.str()));
 }
 
 void 
