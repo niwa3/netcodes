@@ -18,8 +18,8 @@
  * Author:  Tom Henderson (tomhend@u.washington.edu)
  */
 
-#ifndef MY_TCP_SERVER_H
-#define MY_TCP_SERVER_H
+#ifndef MY_RECEIVE_SERVER_H
+#define MY_RECEIVE_SERVER_H
 
 #include <map>
 #include <array>
@@ -41,10 +41,10 @@ class RandomVariableStream;
 
 /**
  * \ingroup applications 
- * \defgroup mytcpserver MyTcpServer
+ * \defgroup mytcpserver MyReceiveServer
  *
  * This application was written to complement OnOffApplication, but it
- * is more general so a MyTcpServer name was selected.  Functionally it is
+ * is more general so a MyReceiveServer name was selected.  Functionally it is
  * important to use in multicast situations, so that reception of the layer-2
  * multicast frames of interest are enabled, but it is also useful for
  * unicast as an example of how you can write something simple to receive
@@ -58,7 +58,7 @@ class RandomVariableStream;
  * \brief Receive and consume traffic generated to an IP address and port
  *
  * This application was written to complement OnOffApplication, but it
- * is more general so a MyTcpServer name was selected.  Functionally it is
+ * is more general so a MyReceiveServer name was selected.  Functionally it is
  * important to use in multicast situations, so that reception of the layer-2
  * multicast frames of interest are enabled, but it is also useful for
  * unicast as an example of how you can write something simple to receive
@@ -71,7 +71,7 @@ class RandomVariableStream;
  * enabled, it prints out the size of packets and their address.
  * A tracing source to Receive() is also available.
  */
-class MyTcpServer : public Application
+class MyReceiveServer : public Application
 {
 public:
   /**
@@ -79,9 +79,9 @@ public:
    * \return the object TypeId
    */
   static TypeId GetTypeId (void);
-  MyTcpServer ();
+  MyReceiveServer ();
 
-  virtual ~MyTcpServer ();
+  virtual ~MyReceiveServer ();
 
   /**
    * \return the total bytes received in this sink app
@@ -142,32 +142,16 @@ private:
 
   uint32_t        m_pktSize;
   std::map<Address, Ptr<Packet>> buff;
-  Ptr<RandomVariableStream>  m_calctime;      //!< rng for calc time
-  bool m_isBusy; //flag that server is now busy or not
   Ipv4Address m_nodeAddress; //own node address
-  MyQueue m_jobQueue;
-  Ptr<Socket> m_nextServiceSocket;
-  Address m_peer;
-  EventId m_sendEvent;
 
-  //void Response(Ptr<Packet> packet, Ptr<Socket> socket);
-  void Response(Ptr<Packet> packet);
-  void SendNext(Ptr<Packet> packet);
   bool HandleRequest(Ptr<Socket> socket, const Address& from);
 
   std::string PacketDeserialize(Ptr<Packet> packet);
   Address ParseData(std::string data);
-  Ptr<Socket> CreateSocket(Address peer);
-
-  void ConnectionSucceeded(Ptr<Socket> socket);
-  void ConnectionFailed(Ptr<Socket> socket);
-
-  typedef void (* ServiceTimeTracedCallback) (const Time& calcTime);
 
   /// Traced Callback: received packets, source address.
   TracedCallback<Ptr<const Packet>, const Address &> m_rxTrace;
   TracedCallback<Ptr<const Packet>> m_txTrace;
-  TracedCallback<const Time &> m_serviceTrace;
 };
 
 } // namespace ns3

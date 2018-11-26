@@ -157,8 +157,9 @@ private:
   uint64_t        m_totalRx;
   std::map<Address, Ptr<Packet>> buff;
   Ipv4Address m_clientAddress;
+  Address m_actuator;
 
-  Ptr<Packet> CreatePacket(uint32_t pktSize);
+  Ptr<Packet> CreatePacket(uint32_t pktSize, Address peer);
 
   /// Traced Callback: transmitted packets.
   TracedCallback<Ptr<const Packet>> m_txTrace;

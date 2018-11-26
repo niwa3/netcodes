@@ -57,6 +57,10 @@ MyOnOffApplication::GetTypeId(void)
                    AddressValue(),
                    MakeAddressAccessor(&MyOnOffApplication::m_peer),
                    MakeAddressChecker())
+    .AddAttribute("Actuator", "The address of the actuator",
+                   AddressValue(),
+                   MakeAddressAccessor(&MyOnOffApplication::m_actuator),
+                   MakeAddressChecker())
     .AddAttribute("OnTime", "A RandomVariableStream used to pick the duration of the 'On' state.",
                    StringValue("ns3::ConstantRandomVariable[Constant=1.0]"),
                    MakePointerAccessor(&MyOnOffApplication::m_onTime),
@@ -287,7 +291,7 @@ void MyOnOffApplication::SendPacket()
   NS_LOG_FUNCTION(this);
 
   NS_ASSERT(m_sendEvent.IsExpired());
-  Ptr<Packet> packet = CreatePacket(m_pktSize);
+  Ptr<Packet> packet = CreatePacket(m_pktSize, m_actuator);
   m_txTrace(packet);
   int sendSize = m_socket->Send(packet);
   NS_LOG_DEBUG("HttpClient (" << m_clientAddress << ") >> Sending request for "
@@ -346,8 +350,8 @@ void MyOnOffApplication::HandleReceive (Ptr<Socket> socket)
   }
 }
 
-Ptr<Packet> MyOnOffApplication::CreatePacket(uint32_t pktSize){
-  Ptr<Packet> packet = Create<Packet>((uint8_t*)CreateData(m_peer).c_str(),pktSize);
+Ptr<Packet> MyOnOffApplication::CreatePacket(uint32_t pktSize, Address peer){
+  Ptr<Packet> packet = Create<Packet>((uint8_t*)CreateData(peer).c_str(),pktSize);
   return packet;
 }
 

@@ -97,13 +97,6 @@ TxTracer(Ptr<OutputStreamWrapper> stream, Ptr<const Packet> packet)
   *stream->GetStream() << Simulator::Now().GetNanoSeconds() << " " << packet->GetSize() << std::endl;
 }
 
-/*
-static void
-ServiceTimeTracer(Ptr<OutputStreamWrapper> stream, const Time& time){
-  *stream->GetStream() << Simulator::Now().GetNanoSeconds() << " " << time << std::endl;
-}
-*/
-
 int
 main(int argc, char *argv[])
 {
@@ -192,24 +185,42 @@ main(int argc, char *argv[])
   sinkApps.Start(Seconds(0.1));
   sinkApps.Stop(Seconds(SIM_TIME+5));
 
+  //AddressValue nextAddress(InetSocketAddress(interfaces[0].GetAddress(0), sinkPort));
+  MyTcpServerHelper secondServerHelper(protocol, 5096, 500.0, InetSocketAddress(Ipv4Address::GetAny(), sinkPort), InetSocketAddress(interfaces[0].GetAddress(0), sinkPort));
+  ApplicationContainer secondApps = secondServerHelper.Install(allNodes.Get(1));
+  secondApps.Start(Seconds(0.1));
+  secondApps.Stop(Seconds(SIM_TIME+5));
+
   MyOnOffHelper clientHelper(protocol, Address());
-  AddressValue remoteAddress(InetSocketAddress(interfaces[0].GetAddress(0), sinkPort));
   clientHelper.SetAttribute("OnTime", StringValue("ns3::ConstantRandomVariable[Constant=1]"));
   clientHelper.SetAttribute("OffTime", StringValue("ns3::ExponentialRandomVariable[Mean=1]"));
-  //clientHelper.SetConstantRate(DataRateValue("100Gb/p"), UintegerValue(5096));
   clientHelper.SetAttribute("PacketSize", UintegerValue(5096));
   clientHelper.SetAttribute("DataRate", DataRateValue(DataRate("1Mb/s")));
-  clientHelper.SetAttribute("Remote",remoteAddress);
+  MyReceiveServerHelper serverHelper(protocol, 5096, InetSocketAddress(Ipv4Address::GetAny(), sinkPort));
+
   std::vector<Ptr<Socket>> ns3TcpSockets;
-  ApplicationContainer clientApps[END_NODES];
   for(int i=0; i<END_NODES; i++){
     int endNodeId = ALL_NODES-END_NODES+i;
-    Ptr<Socket> ns3TcpSocket = Socket::CreateSocket(allNodes.Get(endNodeId), TcpSocketFactory::GetTypeId());
+
+    std::cout<<allNodes.Get(1)->GetObject<Ipv4>()->GetAddress(i+2,0).GetLocal()<<std::endl;
+    AddressValue remoteAddress(InetSocketAddress(allNodes.Get(1)->GetObject<Ipv4>()->GetAddress(i+2,0).GetLocal(), sinkPort));
+    clientHelper.SetAttribute("Remote",remoteAddress);
+    AddressValue actuator(InetSocketAddress(allNodes.Get(endNodeId)->GetObject<Ipv4>()->GetAddress(1,0).GetLocal(), sinkPort));
+    clientHelper.SetAttribute("Actuator",actuator);
+
     ApplicationContainer clientApp;
-    clientApps[i] = ApplicationContainer(clientHelper.Install(allNodes.Get(endNodeId)));
-    clientApps[i].Get(0)->GetObject<MyOnOffApplication>()->SetSocket(ns3TcpSocket);
-    clientApps[i].Start(Seconds(1.0));
-    clientApps[i].Stop(Seconds(SIM_TIME));
+    clientApp.Add(clientHelper.Install(allNodes.Get(endNodeId)));
+    ApplicationContainer serverApp;
+    serverApp.Add(serverHelper.Install(allNodes.Get(endNodeId)));
+
+    Ptr<Socket> ns3TcpSocket = Socket::CreateSocket(allNodes.Get(endNodeId), TcpSocketFactory::GetTypeId());
+    clientApp.Get(0)->GetObject<MyOnOffApplication>()->SetSocket(ns3TcpSocket);
+
+    clientApp.Start(Seconds(1.0));
+    clientApp.Stop(Seconds(SIM_TIME));
+    serverApp.Start(Seconds(1.0));
+    serverApp.Stop(Seconds(SIM_TIME+10));
+
     ns3TcpSockets.push_back(ns3TcpSocket);
  }
 
@@ -226,15 +237,15 @@ main(int argc, char *argv[])
     std::stringstream rxFile;
     rxFile << "myExample-Rx-" << allNodes.Get(endNodeId)->GetId() << ".csv";
     std::stringstream rxPath;
-    rxPath << "/NodeList/" << allNodes.Get(endNodeId)->GetId() << "/ApplicationList/*/$ns3::MyOnOffApplication/Rx";
+    rxPath << "/NodeList/" << allNodes.Get(endNodeId)->GetId() << "/ApplicationList/*/$ns3::MyReceiveServer/Rx";
     Ptr<OutputStreamWrapper> rxStream = asciiTraceHelper.CreateFileStream(rxFile.str().c_str());
     Config::ConnectWithoutContext(rxPath.str().c_str(),MakeBoundCallback(&RxTracer, rxStream));
   }
 
   Ptr<OutputStreamWrapper> rxStream = asciiTraceHelper.CreateFileStream("myExample-RxServer.csv");
-  Config::ConnectWithoutContext ("/NodeList/*/ApplicationList/*/$ns3::MyTcpServer/Rx", MakeBoundCallback(&RxTracer, rxStream));
+  Config::ConnectWithoutContext ("/NodeList/0/ApplicationList/*/$ns3::MyTcpServer/Rx", MakeBoundCallback(&RxTracer, rxStream));
   Ptr<OutputStreamWrapper> txStream = asciiTraceHelper.CreateFileStream("myExample-TxServer.csv");
-  Config::ConnectWithoutContext ("/NodeList/*/ApplicationList/*/$ns3::MyTcpServer/Tx", MakeBoundCallback(&TxTracer, txStream));
+  Config::ConnectWithoutContext ("/NodeList/0/ApplicationList/*/$ns3::MyTcpServer/Tx", MakeBoundCallback(&TxTracer, txStream));
 
   Simulator::Stop(Seconds(SIM_TIME+5));
   //config.ConfigureAttributes();
