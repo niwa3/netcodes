@@ -17,27 +17,27 @@
  *
  * Author: Mathieu Lacage <mathieu.lacage@sophia.inria.fr>
  */
-#ifndef MY_TCP_SERVER_HELPER_H
-#define MY_TCP_SERVER_HELPER_H
+#ifndef MY_RECEIVE_SERVER_HELPER_H
+#define MY_RECEIVE_SERVER_HELPER_H
 
 #include "ns3/object-factory.h"
 #include "ns3/ipv4-address.h"
 #include "ns3/node-container.h"
 #include "ns3/application-container.h"
-#include "ns3/my-tcp-server.h"
+#include "ns3/my-receive-server.h"
 
 namespace ns3 {
 
 /**
- * \ingroup MyTcpServer 
- * \brief A helper to make it easier to instantiate an ns3::MyTcpServerApplication
+ * \ingroup MyReceiverServer 
+ * \brief A helper to make it easier to instantiate an ns3::MyReceiverServerApplication
  * on a set of nodes.
  */
-class MyTcpServerHelper
+class MyReceiveServerHelper
 {
 public:
   /**
-   * Create a MyTcpServerHelper to make it easier to work with MyTcpServerApplications
+   * Create a MyReceiveServerHelper to make it easier to work with MyReceiverServerApplications
    *
    * \param protocol the name of the protocol to use to receive traffic
    *        This string identifies the socket factory type used to create
@@ -46,8 +46,7 @@ public:
    * \param address the address of the sink,
    *
    */
-  MyTcpServerHelper (std::string protocol, uint32_t pktSize, double meanCalctime, Address address);
-  MyTcpServerHelper (std::string protocol, uint32_t pktSize, double meanCalctime, Address address, Address nextService);
+  MyReceiveServerHelper (std::string protocol, uint32_t pktSize, Address address);
 
   /**
    * Helper function used to set the underlying application attributes.
@@ -58,39 +57,39 @@ public:
   void SetAttribute (std::string name, const AttributeValue &value);
 
   /**
-   * Install an ns3::MyTcpServerApplication on each node of the input container
+   * Install an ns3::MyReceiverServerApplication on each node of the input container
    * configured with all the attributes set with SetAttribute.
    *
-   * \param c NodeContainer of the set of nodes on which a MyTcpServerApplication 
+   * \param c NodeContainer of the set of nodes on which a MyReceiverServerApplication 
    * will be installed.
    * \returns Container of Ptr to the applications installed.
    */
   ApplicationContainer Install (NodeContainer c) const;
 
   /**
-   * Install an ns3::MyTcpServerApplication on each node of the input container
+   * Install an ns3::MyReceiverServerApplication on each node of the input container
    * configured with all the attributes set with SetAttribute.
    *
-   * \param node The node on which a MyTcpServerApplication will be installed.
+   * \param node The node on which a MyReceiverServerApplication will be installed.
    * \returns Container of Ptr to the applications installed.
    */
   ApplicationContainer Install (Ptr<Node> node) const;
 
   /**
-   * Install an ns3::MyTcpServerApplication on each node of the input container
+   * Install an ns3::MyReceiverServerApplication on each node of the input container
    * configured with all the attributes set with SetAttribute.
    *
-   * \param nodeName The name of the node on which a MyTcpServerApplication will be installed.
+   * \param nodeName The name of the node on which a MyReceiverServerApplication will be installed.
    * \returns Container of Ptr to the applications installed.
    */
   ApplicationContainer Install (std::string nodeName) const;
 
 private:
   /**
-   * Install an ns3::MyTcpServer on the node configured with all the
+   * Install an ns3::MyReceiverServer on the node configured with all the
    * attributes set with SetAttribute.
    *
-   * \param node The node on which an MyTcpServer will be installed.
+   * \param node The node on which an MyReceiverServer will be installed.
    * \returns Ptr to the application installed.
    */
   Ptr<Application> InstallPriv (Ptr<Node> node) const;

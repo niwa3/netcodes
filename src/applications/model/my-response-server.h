@@ -18,8 +18,8 @@
  * Author:  Tom Henderson (tomhend@u.washington.edu)
  */
 
-#ifndef MY_TCP_SERVER_H
-#define MY_TCP_SERVER_H
+#ifndef MY_RESPONSE_SERVER_H
+#define MY_RESPONSE_SERVER_H
 
 #include <map>
 #include <array>
@@ -146,18 +146,13 @@ private:
   bool m_isBusy; //flag that server is now busy or not
   Ipv4Address m_nodeAddress; //own node address
   MyQueue m_jobQueue;
-  Ptr<Socket> m_nextServiceSocket;
-  Address m_peer;
-  EventId m_sendEvent;
 
   //void Response(Ptr<Packet> packet, Ptr<Socket> socket);
-  void Response(Ptr<Packet> packet);
-  void SendNext(Ptr<Packet> packet);
+  void Response(Ptr<Packet> packet, Ptr<Socket> socket);
   bool HandleRequest(Ptr<Socket> socket, const Address& from);
 
   std::string PacketDeserialize(Ptr<Packet> packet);
   Address ParseData(std::string data);
-  Ptr<Socket> CreateSocket(Address peer);
 
   void ConnectionSucceeded(Ptr<Socket> socket);
   void ConnectionFailed(Ptr<Socket> socket);

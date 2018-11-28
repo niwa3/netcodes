@@ -1,7 +1,5 @@
 /* -*- Mode:C++; c-file-style:"gnu"; indent-tabs-mode:nil; -*- */
 
-#include "my-onoff-application.h"
-
 #include "ns3/log.h"
 #include "ns3/address.h"
 #include "ns3/inet-socket-address.h"
@@ -22,6 +20,11 @@
 #include "ns3/string.h"
 #include "ns3/pointer.h"
 #include "ns3/ipv4.h"
+#include "my-onoff-application.h"
+
+#include <sstream>
+#include <map>
+#include "ns3/json.h"
 
 /**
  * This module is OnOffApplication for my study.
@@ -53,6 +56,10 @@ MyOnOffApplication::GetTypeId(void)
     .AddAttribute("Remote", "The address of the destination",
                    AddressValue(),
                    MakeAddressAccessor(&MyOnOffApplication::m_peer),
+                   MakeAddressChecker())
+    .AddAttribute("Actuator", "The address of the actuator",
+                   AddressValue(),
+                   MakeAddressAccessor(&MyOnOffApplication::m_actuator),
                    MakeAddressChecker())
     .AddAttribute("OnTime", "A RandomVariableStream used to pick the duration of the 'On' state.",
                    StringValue("ns3::ConstantRandomVariable[Constant=1.0]"),
@@ -284,30 +291,12 @@ void MyOnOffApplication::SendPacket()
   NS_LOG_FUNCTION(this);
 
   NS_ASSERT(m_sendEvent.IsExpired());
-  Ptr<Packet> packet = Create<Packet>(m_pktSize);
+  Ptr<Packet> packet = CreatePacket(m_pktSize, m_actuator);
   m_txTrace(packet);
   int sendSize = m_socket->Send(packet);
   NS_LOG_DEBUG("HttpClient (" << m_clientAddress << ") >> Sending request for "
               << " to server (" << InetSocketAddress::ConvertFrom(m_peer).GetIpv4() << ") size: "<<sendSize << ".");
   m_totBytes += m_pktSize;
-  if(InetSocketAddress::IsMatchingType(m_peer))
-    {
-      NS_LOG_INFO("At time " << Simulator::Now().GetSeconds()
-                   << "s on-off application sent "
-                   << packet->GetSize() << " bytes to "
-                   << InetSocketAddress::ConvertFrom(m_peer).GetIpv4()
-                   << " port " << InetSocketAddress::ConvertFrom(m_peer).GetPort()
-                   << " total Tx " << m_totBytes << " bytes");
-    }
-  else if(Inet6SocketAddress::IsMatchingType(m_peer))
-    {
-      NS_LOG_INFO("At time " << Simulator::Now().GetSeconds()
-                   << "s on-off application sent "
-                   << packet->GetSize() << " bytes to "
-                   << Inet6SocketAddress::ConvertFrom(m_peer).GetIpv6()
-                   << " port " << Inet6SocketAddress::ConvertFrom(m_peer).GetPort()
-                   << " total Tx " << m_totBytes << " bytes");
-    }
   m_lastStartTime = Simulator::Now();
   m_residualBits = 0;
   if(m_bulksend==true){
@@ -359,6 +348,30 @@ void MyOnOffApplication::HandleReceive (Ptr<Socket> socket)
       buff[from]->RemoveAtStart(m_pktSize);
     }
   }
+}
+
+Ptr<Packet> MyOnOffApplication::CreatePacket(uint32_t pktSize, Address peer){
+  Ptr<Packet> packet = Create<Packet>((uint8_t*)CreateData(peer).c_str(),pktSize);
+  return packet;
+}
+
+std::string MyOnOffApplication::CreateData(Address addr){
+  std::stringstream nAddr;
+  nAddr << m_clientAddress;
+  std::stringstream aAddr;
+  aAddr << InetSocketAddress::ConvertFrom(addr).GetIpv4();
+  int aPort = InetSocketAddress::ConvertFrom(addr).GetPort();
+  std::map<std::string,std::string> nodeId {{"Address", nAddr.str()}};
+  json11::Json actId = json11::Json::object({
+    {"Address", aAddr.str()},
+    {"Port", aPort},
+  });
+  
+  json11::Json obj = json11::Json::object({
+    {"NodeId", nodeId},
+    {"ActuatorId", actId},
+  });
+  return obj.dump();
 }
 
 }

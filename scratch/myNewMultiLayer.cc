@@ -30,6 +30,8 @@
 #include "ns3/gtk-config-store.h"
 #include "ns3/node-list.h"
 
+#include "ns3/my-tree.h"
+
 using namespace ns3;
 
 NS_LOG_COMPONENT_DEFINE("ScriptExample");
@@ -37,12 +39,6 @@ NS_LOG_COMPONENT_DEFINE("ScriptExample");
 //Grobal
 static const double SIM_TIME = 360.0;
 static const int MTU = 1500;
-
-//functions
-static void RxTracer(Ptr<OutputStreamWrapper> stream, Ptr<const Packet> packet, const Address& address);
-static void TxTracer(Ptr<OutputStreamWrapper> stream, Ptr<const Packet> packet);
-std::vector<int> stringSplitToInt(const std::string &str, char sep);
-std::vector<std::string> stringSplit(const std::string &str, char sep);
 
 //My functions start
 std::vector<int> stringSplitToInt(const std::string &str, char sep)
@@ -97,11 +93,6 @@ TxTracer(Ptr<OutputStreamWrapper> stream, Ptr<const Packet> packet)
   *stream->GetStream() << Simulator::Now().GetNanoSeconds() << " " << packet->GetSize() << std::endl;
 }
 
-static void
-ServiceTimeTracer(Ptr<OutputStreamWrapper> stream, const Time& time){
-  *stream->GetStream() << Simulator::Now().GetNanoSeconds() << " " << time << std::endl;
-}
-
 int
 main(int argc, char *argv[])
 {
@@ -119,10 +110,10 @@ main(int argc, char *argv[])
   cmd.Parse(argc, argv);
 
   const std::vector<int> NODE_NUM = stringSplitToInt(nodeNum, '-');
-  const int END_NODES = arrayProduct(NODE_NUM);
-  const int ALL_NODES = arrayProductSum(NODE_NUM);
-  const int LAYER = NODE_NUM.size();
-  const int NET_LAYER = LAYER-1;
+  //const int END_NODES = arrayProduct(NODE_NUM);
+  //const int ALL_NODES = arrayProductSum(NODE_NUM);
+  //const int LAYER = NODE_NUM.size();
+  //const int NET_LAYER = LAYER-1;
   const std::vector<std::string> BANDS = stringSplit(bands, '-');
   const std::vector<std::string> DELAYS = stringSplit(delays, '-');
 
@@ -140,101 +131,93 @@ main(int argc, char *argv[])
 
   Config::SetDefault ("ns3::TcpSocket::SegmentSize", UintegerValue(MSS));
 
-  NodeContainer allNodes;
-  allNodes.Create(ALL_NODES);
+  PointToPointTreeHelper p2ptree(NODE_NUM,BANDS,DELAYS);
 
   InternetStackHelper internet;
   internet.SetIpv6StackInstall(false);
-  internet.InstallAll();
-
+  p2ptree.InstallStack(internet);
 
   Ipv4AddressHelper address;
   address.SetBase("10.0.1.0", "255.255.255.252");
 
-  std::ofstream ifs("myExample-NodeList.csv");
-  ifs<<"fromN fromA toN toA"<<std::endl;
-
-  NetDeviceContainer devices[ALL_NODES-1];
-  Ipv4InterfaceContainer interfaces[ALL_NODES-1];
-  int devicesIndex = 0;
-  int fromNodeId = 0;
-  int toNodeId = 1;
-  for(int i=0; i<NET_LAYER; i++){
-    PointToPointHelper p2p;
-    p2p.SetDeviceAttribute("DataRate", StringValue(BANDS[i]));
-    p2p.SetChannelAttribute("Delay", StringValue(DELAYS[i]));
-    for(int j=0; j<(i==0 ? 1: NODE_NUM[i-1]); j++){
-      for(int k=0; k<NODE_NUM[i]; k++){
-        for(int l=0; l<NODE_NUM[i+1]; l++){
-          std::cout<<devicesIndex<<" "<<fromNodeId<<" "<<toNodeId<<std::endl;
-          devices[devicesIndex] = p2p.Install(allNodes.Get(fromNodeId),allNodes.Get(toNodeId));
-          interfaces[devicesIndex] = address.Assign(devices[devicesIndex]);
-          ifs <<allNodes.Get(fromNodeId)->GetId()<<" "<<InetSocketAddress(interfaces[devicesIndex].GetAddress(0), sinkPort).GetIpv4()<<" "
-              <<allNodes.Get(toNodeId)->GetId()<<" "<<InetSocketAddress(interfaces[devicesIndex].GetAddress(1), sinkPort).GetIpv4()<<std::endl;
-          devicesIndex++;
-          toNodeId++;
-          address.NewNetwork();
-        }
-        fromNodeId++;
-      }
-    }
-  }
-  ifs.close();
+  p2ptree.AssignIpv4Addresses(address);
 
   Ipv4GlobalRoutingHelper::PopulateRoutingTables();
 
   std::string protocol = "ns3::TcpSocketFactory";
 
-  MyTcpServerHelper myTcpServerHelper(protocol, 5096, 1000.0, InetSocketAddress(Ipv4Address::GetAny(), sinkPort));
-  ApplicationContainer sinkApps = myTcpServerHelper.Install(allNodes.Get(0));
+  MyTcpServerHelper myTcpServerHelper(protocol, 5096, 100.0, InetSocketAddress(Ipv4Address::GetAny(), sinkPort));
+  ApplicationContainer sinkApps = myTcpServerHelper.Install(p2ptree.GetNode(0,0,0));
   sinkApps.Start(Seconds(0.1));
   sinkApps.Stop(Seconds(SIM_TIME+5));
 
+  //MyTcpServerHelper secondServerHelper(protocol, 5096, 100.0, InetSocketAddress(Ipv4Address::GetAny(), sinkPort), InetSocketAddress(p2ptree.GetIpv4Address(0,0,0,1) , sinkPort));
+  //ApplicationContainer secondApps = secondServerHelper.Install(p2ptree.GetNode(1,0,0));
+  //secondApps.Start(Seconds(0.1));
+  //secondApps.Stop(Seconds(SIM_TIME+5));
+
   MyOnOffHelper clientHelper(protocol, Address());
-  AddressValue remoteAddress(InetSocketAddress(interfaces[0].GetAddress(0), sinkPort));
   clientHelper.SetAttribute("OnTime", StringValue("ns3::ConstantRandomVariable[Constant=1]"));
   clientHelper.SetAttribute("OffTime", StringValue("ns3::ExponentialRandomVariable[Mean=1]"));
-  //clientHelper.SetConstantRate(DataRateValue("100Gb/p"), UintegerValue(5096));
   clientHelper.SetAttribute("PacketSize", UintegerValue(5096));
   clientHelper.SetAttribute("DataRate", DataRateValue(DataRate("1Mb/s")));
-  clientHelper.SetAttribute("Remote",remoteAddress);
+  MyReceiveServerHelper serverHelper(protocol, 5096, InetSocketAddress(Ipv4Address::GetAny(), sinkPort));
+
   std::vector<Ptr<Socket>> ns3TcpSockets;
-  ApplicationContainer clientApps[END_NODES];
-  for(int i=0; i<END_NODES; i++){
-    int endNodeId = ALL_NODES-END_NODES+i;
-    Ptr<Socket> ns3TcpSocket = Socket::CreateSocket(allNodes.Get(endNodeId), TcpSocketFactory::GetTypeId());
-    ApplicationContainer clientApp;
-    clientApps[i] = ApplicationContainer(clientHelper.Install(allNodes.Get(endNodeId)));
-    clientApps[i].Get(0)->GetObject<MyOnOffApplication>()->SetSocket(ns3TcpSocket);
-    clientApps[i].Start(Seconds(1.0));
-    clientApps[i].Stop(Seconds(SIM_TIME));
-    ns3TcpSockets.push_back(ns3TcpSocket);
- }
+  for(size_t i=0;i<p2ptree.GetNGroups(p2ptree.GetNLayers()-1);i++){
+    for(size_t j=0;j<p2ptree.GetNNodes(p2ptree.GetNLayers()-1,i);j++){
+      //AddressValue remoteAddress(InetSocketAddress(p2ptree.GetIpv4Address(1,0,0,j+2), sinkPort));
+      AddressValue remoteAddress(InetSocketAddress(p2ptree.GetIpv4Address(0,0,0,1), sinkPort));
+      clientHelper.SetAttribute("Remote",remoteAddress);
+
+      AddressValue actuator(InetSocketAddress(p2ptree.GetIpv4Address(p2ptree.GetNLayers()-1,i,j,1), sinkPort));
+      clientHelper.SetAttribute("Actuator",actuator);
+
+      ApplicationContainer clientApp;
+      clientApp.Add(clientHelper.Install(p2ptree.GetNode(p2ptree.GetNLayers()-1,i,j)));
+      ApplicationContainer serverApp;
+      clientApp.Add(serverHelper.Install(p2ptree.GetNode(p2ptree.GetNLayers()-1,i,j)));
+
+      Ptr<Socket> ns3TcpSocket = Socket::CreateSocket(p2ptree.GetNode(p2ptree.GetNLayers()-1,i,j), TcpSocketFactory::GetTypeId());
+      clientApp.Get(0)->GetObject<MyOnOffApplication>()->SetSocket(ns3TcpSocket);
+
+      clientApp.Start(Seconds(1.0));
+      clientApp.Stop(Seconds(SIM_TIME));
+      serverApp.Start(Seconds(1.0));
+      serverApp.Stop(Seconds(SIM_TIME+10));
+
+      ns3TcpSockets.push_back(ns3TcpSocket);
+    }
+  }
 
   AsciiTraceHelper asciiTraceHelper;
 
-  for(int i=0;i<END_NODES;i++){
-    int endNodeId = ALL_NODES-END_NODES+i;
-    std::stringstream txFile;
-    txFile << "myExample-Tx-" << allNodes.Get(endNodeId)->GetId() << ".csv";
-    std::stringstream txPath;
-    txPath << "/NodeList/" << allNodes.Get(endNodeId)->GetId() << "/ApplicationList/*/$ns3::MyOnOffApplication/Tx";
-    Ptr<OutputStreamWrapper> txStream = asciiTraceHelper.CreateFileStream(txFile.str().c_str());
-    Config::ConnectWithoutContext(txPath.str().c_str(),MakeBoundCallback(&TxTracer, txStream));
-    std::stringstream rxFile;
-    rxFile << "myExample-Rx-" << allNodes.Get(endNodeId)->GetId() << ".csv";
-    std::stringstream rxPath;
-    rxPath << "/NodeList/" << allNodes.Get(endNodeId)->GetId() << "/ApplicationList/*/$ns3::MyOnOffApplication/Rx";
-    Ptr<OutputStreamWrapper> rxStream = asciiTraceHelper.CreateFileStream(rxFile.str().c_str());
-    Config::ConnectWithoutContext(rxPath.str().c_str(),MakeBoundCallback(&RxTracer, rxStream));
+  for(size_t i=0;i<p2ptree.GetNGroups(p2ptree.GetNLayers()-1);i++){
+    for(size_t j=0;j<p2ptree.GetNNodes(p2ptree.GetNLayers()-1,i);j++){
+      uint32_t id = p2ptree.GetNode(p2ptree.GetNLayers()-1,i,j)->GetId();
+      std::stringstream txFile;
+      txFile << "myExampleTx-" << id << ".csv";
+      std::stringstream txPath;
+      txPath << "/NodeList/" << id << "/ApplicationList/*/$ns3::MyOnOffApplication/Tx";
+      Ptr<OutputStreamWrapper> txStream = asciiTraceHelper.CreateFileStream(txFile.str().c_str());
+      Config::ConnectWithoutContext(txPath.str().c_str(),MakeBoundCallback(&TxTracer, txStream));
+      std::stringstream rxFile;
+      rxFile << "myExampleRx-" << id << ".csv";
+      std::stringstream rxPath;
+      rxPath << "/NodeList/" << id << "/ApplicationList/*/$ns3::MyReceiveServer/Rx";
+      Ptr<OutputStreamWrapper> rxStream = asciiTraceHelper.CreateFileStream(rxFile.str().c_str());
+      Config::ConnectWithoutContext(rxPath.str().c_str(),MakeBoundCallback(&RxTracer, rxStream));
+    }
   }
 
-  Ptr<OutputStreamWrapper> rxStream = asciiTraceHelper.CreateFileStream("myExample-RxServer.csv");
-  Config::ConnectWithoutContext ("/NodeList/*/ApplicationList/*/$ns3::MyTcpServer/Rx", MakeBoundCallback(&RxTracer, rxStream));
-  Ptr<OutputStreamWrapper> txStream = asciiTraceHelper.CreateFileStream("myExample-TxServer.csv");
-  Config::ConnectWithoutContext ("/NodeList/*/ApplicationList/*/$ns3::MyTcpServer/Tx", MakeBoundCallback(&TxTracer, txStream));
-  Ptr<OutputStreamWrapper> timeStream = asciiTraceHelper.CreateFileStream("myExample-ServiceTime.csv");
-  Config::ConnectWithoutContext ("/NodeList/*/ApplicationList/*/$ns3::MyTcpServer/ServiceTime", MakeBoundCallback(&ServiceTimeTracer, timeStream));
+  Ptr<OutputStreamWrapper> rxStream = asciiTraceHelper.CreateFileStream("myExampleRxServer.csv");
+  Config::ConnectWithoutContext ("/NodeList/0/ApplicationList/*/$ns3::MyTcpServer/Rx", MakeBoundCallback(&RxTracer, rxStream));
+  Ptr<OutputStreamWrapper> txStream = asciiTraceHelper.CreateFileStream("myExampleTxServer.csv");
+  Config::ConnectWithoutContext ("/NodeList/0/ApplicationList/*/$ns3::MyTcpServer/Tx", MakeBoundCallback(&TxTracer, txStream));
+  Ptr<OutputStreamWrapper> rxStream2 = asciiTraceHelper.CreateFileStream("myExampleRxMidServer.csv");
+  Config::ConnectWithoutContext ("/NodeList/1/ApplicationList/*/$ns3::MyTcpServer/Rx", MakeBoundCallback(&RxTracer, rxStream2));
+  Ptr<OutputStreamWrapper> txStream2 = asciiTraceHelper.CreateFileStream("myExampleTxMidServer.csv");
+  Config::ConnectWithoutContext ("/NodeList/1/ApplicationList/*/$ns3::MyTcpServer/Tx", MakeBoundCallback(&TxTracer, txStream2));
 
   Simulator::Stop(Seconds(SIM_TIME+5));
   //config.ConfigureAttributes();

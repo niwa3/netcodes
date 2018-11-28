@@ -18,7 +18,7 @@
  * Author: Mathieu Lacage <mathieu.lacage@sophia.inria.fr>
  */
 
-#include "my-tcp-server-helper.h"
+#include "my-receive-server-helper.h"
 #include "ns3/string.h"
 #include "ns3/inet-socket-address.h"
 #include "ns3/names.h"
@@ -26,66 +26,49 @@
 
 namespace ns3 {
 
-MyTcpServerHelper::MyTcpServerHelper (std::string protocol, uint32_t pktSize, double meanCalctime, Address address, Address nextService)
+MyReceiveServerHelper::MyReceiveServerHelper (std::string protocol, uint32_t pktSize, Address address)
 {
-  m_factory.SetTypeId("ns3::MyTcpServer");
+  m_factory.SetTypeId("ns3::MyReceiveServer");
   m_factory.Set("Protocol", StringValue (protocol));
   m_factory.Set("PacketSize", UintegerValue(pktSize));
   m_factory.Set("Local", AddressValue (address));
-  std::stringstream calctime;
-  calctime << "ns3::ExponentialRandomVariable[Mean="<<meanCalctime<<"]";
-  m_factory.Set("CalcTime", StringValue (calctime.str()));
-  m_factory.Set("NextService", AddressValue(nextService));
-}
-
-MyTcpServerHelper::MyTcpServerHelper (std::string protocol, uint32_t pktSize, double meanCalctime, Address address)
-{
-  m_factory.SetTypeId("ns3::MyTcpServer");
-  m_factory.Set("Protocol", StringValue (protocol));
-  m_factory.Set("PacketSize", UintegerValue(pktSize));
-  m_factory.Set("Local", AddressValue (address));
-  std::stringstream calctime;
-  calctime << "ns3::ExponentialRandomVariable[Mean="<<meanCalctime<<"]";
-  m_factory.Set("CalcTime", StringValue (calctime.str()));
 }
 
 void 
-MyTcpServerHelper::SetAttribute (std::string name, const AttributeValue &value)
+MyReceiveServerHelper::SetAttribute (std::string name, const AttributeValue &value)
 {
   m_factory.Set (name, value);
 }
 
 ApplicationContainer
-MyTcpServerHelper::Install (Ptr<Node> node) const
+MyReceiveServerHelper::Install (Ptr<Node> node) const
 {
   return ApplicationContainer (InstallPriv (node));
 }
 
 ApplicationContainer
-MyTcpServerHelper::Install (std::string nodeName) const
+MyReceiveServerHelper::Install (std::string nodeName) const
 {
   Ptr<Node> node = Names::Find<Node> (nodeName);
   return ApplicationContainer (InstallPriv (node));
 }
 
 ApplicationContainer
-MyTcpServerHelper::Install (NodeContainer c) const
+MyReceiveServerHelper::Install (NodeContainer c) const
 {
   ApplicationContainer apps;
   for (NodeContainer::Iterator i = c.Begin (); i != c.End (); ++i)
     {
       apps.Add (InstallPriv (*i));
     }
-
   return apps;
 }
 
 Ptr<Application>
-MyTcpServerHelper::InstallPriv (Ptr<Node> node) const
+MyReceiveServerHelper::InstallPriv (Ptr<Node> node) const
 {
   Ptr<Application> app = m_factory.Create<Application> ();
   node->AddApplication (app);
-
   return app;
 }
 

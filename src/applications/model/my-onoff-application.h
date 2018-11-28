@@ -152,14 +152,21 @@ private:
   EventId         m_sendEvent;    //!< Event id of pending "send packet" event
   TypeId          m_tid;          //!< Type of the socket used
 
+  //NIWA
   bool            m_bulksend;     //!< Flag of bulk send
   uint64_t        m_totalRx;
   std::map<Address, Ptr<Packet>> buff;
   Ipv4Address m_clientAddress;
+  Address m_actuator;
+
+  Ptr<Packet> CreatePacket(uint32_t pktSize, Address peer);
 
   /// Traced Callback: transmitted packets.
   TracedCallback<Ptr<const Packet>> m_txTrace;
   TracedCallback<Ptr<const Packet>, const Address &> m_rxTrace;
+
+private:
+  std::string CreateData(Address addr);
 
 private:
   /**

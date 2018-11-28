@@ -34,7 +34,8 @@
 #include "ns3/uinteger.h"
 #include "ns3/string.h"
 #include "ns3/pointer.h"
-#include "my-tcp-server.h"
+
+#include "my-response-server.h"
 
 #include "sstream"
 #include "ns3/json.h"
@@ -70,10 +71,6 @@ MyTcpServer::GetTypeId (void)
                    StringValue("ns3::ExponentialRandomVariable[Mean=1.0]"),
                    MakePointerAccessor(&MyTcpServer::m_calctime),
                    MakePointerChecker <RandomVariableStream>())
-    .AddAttribute("NextService", "The address of the next service",
-                   AddressValue(),
-                   MakeAddressAccessor(&MyTcpServer::m_peer),
-                   MakeAddressChecker())
     .AddTraceSource ("Rx",
                      "A packet has been received",
                      MakeTraceSourceAccessor (&MyTcpServer::m_rxTrace),
@@ -81,9 +78,6 @@ MyTcpServer::GetTypeId (void)
     .AddTraceSource("Tx", "A new packet is created and is sent",
                      MakeTraceSourceAccessor(&MyTcpServer::m_txTrace),
                      "ns3::Packet::TracedCallback")
-    .AddTraceSource("ServiceTime", "Service Time",
-                     MakeTraceSourceAccessor(&MyTcpServer::m_serviceTrace),
-                     "ns3::MyTcpServer::ServiceTimeTracedCallback")
   ;
   return tid;
 }
@@ -94,7 +88,6 @@ MyTcpServer::MyTcpServer ()
   NS_LOG_FUNCTION (this);
   m_socket = 0;
   m_totalRx = 0;
-  m_nextServiceSocket = 0;
   m_jobQueue.SetMaxPackets(1000);
 }
 
@@ -128,7 +121,6 @@ void MyTcpServer::DoDispose (void)
   NS_LOG_FUNCTION (this);
   m_socket = 0;
   m_socketList.clear ();
-  m_nextServiceSocket = 0;
 
   // chain up
   Application::DoDispose ();
@@ -166,9 +158,6 @@ void MyTcpServer::StartApplication ()    // Called at time specified by Start
   }
   m_nodeAddress = GetNode()->GetObject<Ipv4>()->GetAddress(1,0).GetLocal();
 
-  if(!m_peer.IsInvalid()){
-    m_nextServiceSocket = CreateSocket(m_peer);
-  }
 }
 
 void MyTcpServer::ConnectionSucceeded(Ptr<Socket> socket)
@@ -185,7 +174,6 @@ void MyTcpServer::ConnectionFailed(Ptr<Socket> socket)
 
 void MyTcpServer::StopApplication ()     // Called at time specified by Stop
 {
-  Simulator::Cancel(m_sendEvent);
   NS_LOG_FUNCTION (this);
   while(!m_socketList.empty ()) //these are accepted sockets, close them
     {
@@ -229,14 +217,8 @@ void MyTcpServer::HandleRead (Ptr<Socket> socket)
         if(m_jobQueue.IsEmpty() && !m_isBusy){
           m_isBusy = true;
           Time calcInterval = MicroSeconds(m_calctime->GetValue());
-          m_serviceTrace(calcInterval);
           NS_LOG_DEBUG("MyTcpServer("<<m_nodeAddress<<") >> start...");
-          if(!m_nextServiceSocket){
-            m_sendEvent = Simulator::Schedule (calcInterval, &MyTcpServer::Response, this, receivedPacket);
-          }
-          else{
-            m_sendEvent = Simulator::Schedule (calcInterval, &MyTcpServer::SendNext, this, receivedPacket);
-          }
+          Simulator::Schedule (calcInterval, &MyTcpServer::Response, this, receivedPacket, socket);
         }
         else{
           Ptr<MyAppQueueItem> newJob = Create<MyAppQueueItem>(receivedPacket, socket);
@@ -247,43 +229,16 @@ void MyTcpServer::HandleRead (Ptr<Socket> socket)
     }
 }
 
-void MyTcpServer::Response(Ptr<Packet> packet){
-  NS_LOG_FUNCTION(this);
-  //TODO
-  //you can add the logic to create response packet
-  Ptr<Packet> rePacket = packet;
-  //TODO
-  //how to send packet to the actuator
-  //とりあえずは、ソケットの張り直しでもいいのではないでしょうか
-  Address peer = ParseData(PacketDeserialize(packet));
-  NS_LOG_DEBUG("MyTcpServer("<<m_nodeAddress<<") >> get actuator address "<<InetSocketAddress::ConvertFrom(peer).GetIpv4()<<" port "<<InetSocketAddress::ConvertFrom(peer).GetPort());
-  Ptr<Socket> distSocket = CreateSocket(peer);
-  int sendSize = distSocket->Send(rePacket);
-  NS_LOG_DEBUG("MyTcpServer("<<m_nodeAddress<<") >> send a packet to "<<InetSocketAddress::ConvertFrom(peer).GetIpv4()<<" size: "<<sendSize);
-  m_txTrace(rePacket);
-  m_isBusy = false;
-  if(m_jobQueue.IsEmpty()){
-    return;
-  }
-  else{
-    m_isBusy = true;
-    Ptr<MyAppQueueItem> item = m_jobQueue.Dequeue();
-    NS_LOG_DEBUG("MyTcpServer("<<m_nodeAddress<<") >> dequeue... (size: "<<m_jobQueue.GetCurrentSize()<<"/"<<m_jobQueue.GetMaxPackets()<<")");
-    Time calcInterval = MicroSeconds(m_calctime->GetValue());
-    m_serviceTrace(calcInterval);
-    NS_LOG_DEBUG("MyTcpServer("<<m_nodeAddress<<") >> start...");
-    m_sendEvent = Simulator::Schedule (calcInterval, &MyTcpServer::Response, this, item->GetPacket());
-  }
-}
-
-void MyTcpServer::SendNext(Ptr<Packet> packet){
-  NS_LOG_FUNCTION(this);
+void MyTcpServer::Response(Ptr<Packet> packet, Ptr<Socket> socket){
+  NS_LOG_FUNCTION(this << socket);
   //TODO
   //you can add the logic to create response packet
   //Ptr<Packet> rePacket = Create<Packet>(m_pktSize);
   Ptr<Packet> rePacket = packet;
-  int sendSize = m_nextServiceSocket->Send(rePacket);
-  NS_LOG_DEBUG("MyTcpServer("<<m_nodeAddress<<") >> send a packet to "<<InetSocketAddress::ConvertFrom(m_peer).GetIpv4()<<" size: "<<sendSize);
+  Address peerAddress;
+  socket->GetPeerName(peerAddress);
+  int sendSize = socket->Send(rePacket);
+  NS_LOG_DEBUG("MyTcpServer("<<m_nodeAddress<<") >> send a packet to "<<InetSocketAddress::ConvertFrom(peerAddress).GetIpv4()<<" size: "<<sendSize);
   m_txTrace(rePacket);
   m_isBusy = false;
   if(m_jobQueue.IsEmpty()){
@@ -294,9 +249,8 @@ void MyTcpServer::SendNext(Ptr<Packet> packet){
     Ptr<MyAppQueueItem> item = m_jobQueue.Dequeue();
     NS_LOG_DEBUG("MyTcpServer("<<m_nodeAddress<<") >> dequeue... (size: "<<m_jobQueue.GetCurrentSize()<<"/"<<m_jobQueue.GetMaxPackets()<<")");
     Time calcInterval = MicroSeconds(m_calctime->GetValue());
-    m_serviceTrace(calcInterval);
     NS_LOG_DEBUG("MyTcpServer("<<m_nodeAddress<<") >> start...");
-    m_sendEvent = Simulator::Schedule (calcInterval, &MyTcpServer::SendNext, this, item->GetPacket());
+    Simulator::Schedule (calcInterval, &MyTcpServer::Response, this, item->GetPacket(), item->GetSocket());
   }
 }
 
@@ -341,31 +295,6 @@ Address MyTcpServer::ParseData(std::string data){
   auto json = json11::Json::parse(data, err);
   Ipv4Address aAddr(json["ActuatorId"]["Address"].string_value().c_str());
   return InetSocketAddress(aAddr, json["ActuatorId"]["Port"].int_value());
-}
-
-Ptr<Socket> MyTcpServer::CreateSocket(Address peer)    // Called at time specified by Start
-{
-  NS_LOG_FUNCTION (this);
-
-  Ptr<Socket> s = Socket::CreateSocket (GetNode (), m_tid);
-  if(!peer.IsInvalid()){
-    if(InetSocketAddress::IsMatchingType(peer) ||
-             PacketSocketAddress::IsMatchingType(peer))
-      {
-        if(s->Bind() == -1)
-          {
-            NS_FATAL_ERROR("Failed to bind socket");
-          }
-      }
-    NS_LOG_DEBUG("try to connect");
-    s->Connect(peer);
-    s->SetAllowBroadcast(true);
-
-    s->SetConnectCallback(
-      MakeCallback(&MyTcpServer::ConnectionSucceeded, this),
-      MakeCallback(&MyTcpServer::ConnectionFailed, this));
-  }
-  return s;
 }
 
 } // Namespace ns3
