@@ -75,7 +75,7 @@ public:
 
   size_t GetNNodes(uint32_t nLayer, uint32_t nGroup);
 
-  Ipv4Address GetPairentAddress(uint32_t nLayer, uint32_t nGroup, uint32_t nNode, uint32_t pairentLayer);
+  Ipv4Address GetParentAddress(uint32_t nLayer, uint32_t nGroup, uint32_t nNode, uint32_t parentLayer);
 
 private:
   std::vector<std::vector<NodeContainer>> m_layers;
