@@ -122,7 +122,20 @@ size_t PointToPointTreeHelper::GetNNodes(uint32_t nLayer, uint32_t nGroup){
   return m_layers[nLayer][nGroup].GetN();
 }
 
-Ipv4Address PointToPointTreeHelper::GetPairentAddress(uint32_t nLayer, uint32_t nGroup, uint32_t nNode, uint32_t pairentLayer){
-  return GetIpv4Address(nLayer, nGroup, nNode, nNode);
+Ipv4Address PointToPointTreeHelper::GetParentAddress(uint32_t nLayer, uint32_t nGroup, uint32_t nNode, uint32_t parentLayer){
+  int parentGroup = nGroup / GetNNodes(nLayer-1, 0);
+  int parentNode = nGroup % GetNNodes(nLayer-1, 0);
+  if((nLayer-1)!=parentLayer){
+    return GetParentAddress(nLayer-1,parentGroup,parentNode,parentLayer);
+  }
+  else{
+    if((nLayer-1)==0){
+      return GetIpv4Address(nLayer-1, parentGroup, parentNode, nNode+1);
+    }
+    else{
+      return GetIpv4Address(nLayer-1, parentGroup, parentNode, nNode+2);
+    }
+  }
 }
+
 } // namespace ns3

@@ -148,6 +148,7 @@ private:
   MyQueue m_jobQueue;
   Ptr<Socket> m_nextServiceSocket;
   Address m_peer;
+  std::map<Address, Ptr<Socket>> m_peerSockets;
   EventId m_sendEvent;
 
   //void Response(Ptr<Packet> packet, Ptr<Socket> socket);

@@ -252,12 +252,20 @@ void MyTcpServer::Response(Ptr<Packet> packet){
   //TODO
   //you can add the logic to create response packet
   Ptr<Packet> rePacket = packet;
-  //TODO
-  //how to send packet to the actuator
-  //とりあえずは、ソケットの張り直しでもいいのではないでしょうか
+
   Address peer = ParseData(PacketDeserialize(packet));
+
   NS_LOG_DEBUG("MyTcpServer("<<m_nodeAddress<<") >> get actuator address "<<InetSocketAddress::ConvertFrom(peer).GetIpv4()<<" port "<<InetSocketAddress::ConvertFrom(peer).GetPort());
-  Ptr<Socket> distSocket = CreateSocket(peer);
+
+  Ptr<Socket> distSocket;
+  auto socketItr = m_peerSockets.find(peer);
+  if(socketItr==m_peerSockets.end()){
+    distSocket = CreateSocket(peer);
+    m_peerSockets[peer] = distSocket;
+  }
+  else{
+    distSocket = socketItr->second;
+  }
   int sendSize = distSocket->Send(rePacket);
   NS_LOG_DEBUG("MyTcpServer("<<m_nodeAddress<<") >> send a packet to "<<InetSocketAddress::ConvertFrom(peer).GetIpv4()<<" size: "<<sendSize);
   m_txTrace(rePacket);
@@ -343,7 +351,7 @@ Address MyTcpServer::ParseData(std::string data){
   return InetSocketAddress(aAddr, json["ActuatorId"]["Port"].int_value());
 }
 
-Ptr<Socket> MyTcpServer::CreateSocket(Address peer)    // Called at time specified by Start
+Ptr<Socket> MyTcpServer::CreateSocket(Address peer)
 {
   NS_LOG_FUNCTION (this);
 
@@ -359,7 +367,7 @@ Ptr<Socket> MyTcpServer::CreateSocket(Address peer)    // Called at time specifi
       }
     NS_LOG_DEBUG("try to connect");
     s->Connect(peer);
-    s->SetAllowBroadcast(true);
+    //s->SetAllowBroadcast(true);
 
     s->SetConnectCallback(
       MakeCallback(&MyTcpServer::ConnectionSucceeded, this),
