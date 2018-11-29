@@ -28,6 +28,7 @@
 #include "ns3/internet-stack-helper.h"
 #include "ns3/ipv4-interface-container.h"
 #include "ns3/ipv6-interface-container.h"
+#include "ns3/applications-module.h"
 
 namespace ns3 {
 
@@ -77,6 +78,8 @@ public:
 
   Ipv4Address GetParentAddress(uint32_t nLayer, uint32_t nGroup, uint32_t nNode, uint32_t parentLayer);
 
+  template < class T > ApplicationContainer InstallApp(T& app, uint32_t nLayer);
+
 private:
   std::vector<std::vector<NodeContainer>> m_layers;
   std::vector<NetDeviceContainer> m_devices;
@@ -85,6 +88,16 @@ private:
   std::vector<std::string> m_bandwidths;
   std::vector<std::string> m_delays;
 };
+
+template < class T > ApplicationContainer PointToPointTreeHelper::InstallApp(T& app, uint32_t nLayer){
+  ApplicationContainer appCon;
+  for(size_t i=0;i<GetNGroups(nLayer);i++){
+    for(size_t j=0;j<GetNNodes(nLayer,i);j++){
+      appCon.Add(app.Install(GetNode(nLayer,i,j)));
+    }
+  }
+  return appCon;
+}
 
 } // namespace ns3
 
