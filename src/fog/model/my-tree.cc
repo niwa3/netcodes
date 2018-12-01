@@ -37,6 +37,9 @@ namespace ns3 {
 
 NS_LOG_COMPONENT_DEFINE ("PointToPointTreeHelper");
 
+PointToPointTreeHelper::PointToPointTreeHelper(){
+}
+
 PointToPointTreeHelper::PointToPointTreeHelper(std::vector<int> nodeNums, std::vector<std::string> bandwidth, std::vector<std::string> delays)
 {
   m_nodeNums = nodeNums;

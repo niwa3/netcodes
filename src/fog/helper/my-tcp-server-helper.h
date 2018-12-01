@@ -46,8 +46,9 @@ public:
    * \param address the address of the sink,
    *
    */
-  MyTcpServerHelper (std::string protocol, uint32_t pktSize, double meanCalctime, Address address);
-  MyTcpServerHelper (std::string protocol, uint32_t pktSize, double meanCalctime, Address address, Address nextService);
+  MyTcpServerHelper();
+  MyTcpServerHelper(std::string protocol, uint32_t pktSize, double meanCalctime, Address address);
+  MyTcpServerHelper(std::string protocol, uint32_t pktSize, double meanCalctime, Address address, Address nextService);
 
   /**
    * Helper function used to set the underlying application attributes.
