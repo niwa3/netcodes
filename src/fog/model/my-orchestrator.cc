@@ -91,6 +91,9 @@ void MyOrchestrator::AssignServer(uint8_t serverIndex, uint8_t nLayer){
       if(chaine != m_chaine.end()){
         AddressValue nextService = AddressValue(InetSocketAddress(m_p2pHelper.GetParentAddress(nLayer,i,j,m_serverPlace[m_chaine[serverIndex]]),m_sinkPort));
         m_serverHelper[serverIndex].SetAttribute("NextService", nextService);
+        std::stringstream meanTime;
+        meanTime << "ns3::ExponentialRandomVariable[Mean=" << 100.0*(nLayer+1) << "]";
+        m_serverHelper[serverIndex].SetAttribute("CalcTime", StringValue(meanTime.str()));
       }
       ApplicationContainer servers = m_p2pHelper.InstallApp(m_serverHelper[serverIndex], nLayer);
       servers.Start(Seconds(0.1));
