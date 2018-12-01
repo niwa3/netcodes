@@ -26,6 +26,9 @@
 
 namespace ns3 {
 
+MyTcpServerHelper::MyTcpServerHelper (){
+}
+
 MyTcpServerHelper::MyTcpServerHelper (std::string protocol, uint32_t pktSize, double meanCalctime, Address address, Address nextService)
 {
   m_factory.SetTypeId("ns3::MyTcpServer");

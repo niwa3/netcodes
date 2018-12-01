@@ -58,6 +58,7 @@ public:
    *        used to link nodes together
    */
   PointToPointTreeHelper (std::vector<int> nodeNums, std::vector<std::string> bandwidth, std::vector<std::string> delays);
+  PointToPointTreeHelper();
 
   ~PointToPointTreeHelper ();
 
