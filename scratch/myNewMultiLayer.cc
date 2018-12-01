@@ -26,10 +26,13 @@
 #include "ns3/point-to-point-module.h"
 #include "ns3/applications-module.h"
 #include "ns3/my-onoff-application-helper.h"
+#include "ns3/my-tcp-server-helper.h"
+#include "ns3/my-receive-server-helper.h"
 #include "ns3/flow-monitor-helper.h"
 #include "ns3/gtk-config-store.h"
 
 #include "ns3/my-tree.h"
+#include "ns3/my-orchestrator.h"
 
 using namespace ns3;
 
@@ -79,7 +82,7 @@ main(int argc, char *argv[])
 {
   GtkConfigStore config;
 
-  uint16_t sinkPort = 8080;
+  //uint16_t sinkPort = 8080;
 
   std::string nodeNum = "1-1-5-20";
   std::string bands = "40Gbps-10Gbps-1Gbps";
@@ -124,45 +127,13 @@ main(int argc, char *argv[])
 
   Ipv4GlobalRoutingHelper::PopulateRoutingTables();
 
-  std::string protocol = "ns3::TcpSocketFactory";
+  //std::string protocol = "ns3::TcpSocketFactory";
 
-  MyTcpServerHelper myTcpServerHelper(protocol, 5096, 100.0, InetSocketAddress(Ipv4Address::GetAny(), sinkPort));
-  ApplicationContainer sinkApps = p2ptree.InstallApp(myTcpServerHelper, 0);
-  sinkApps.Start(Seconds(0.1));
-  sinkApps.Stop(Seconds(SIM_TIME+5));
-
-  MyTcpServerHelper secondServerHelper(protocol, 5096, 100.0, InetSocketAddress(Ipv4Address::GetAny(), sinkPort), InetSocketAddress(p2ptree.GetIpv4Address(0,0,0,1) , sinkPort));
-  ApplicationContainer secondApps = p2ptree.InstallApp(secondServerHelper, midServer);
-  secondApps.Start(Seconds(0.1));
-  secondApps.Stop(Seconds(SIM_TIME+5));
-
-  MyOnOffHelper clientHelper(protocol, Address());
-  clientHelper.SetAttribute("OnTime", StringValue("ns3::ConstantRandomVariable[Constant=1]"));
-  clientHelper.SetAttribute("OffTime", StringValue("ns3::ExponentialRandomVariable[Mean=1]"));
-  clientHelper.SetAttribute("PacketSize", UintegerValue(5096));
-  clientHelper.SetAttribute("DataRate", DataRateValue(DataRate("1Mb/s")));
-  MyReceiveServerHelper serverHelper(protocol, 5096, InetSocketAddress(Ipv4Address::GetAny(), sinkPort));
-
-  std::vector<Ptr<Socket>> ns3TcpSockets;
-  for(size_t i=0;i<p2ptree.GetNGroups(p2ptree.GetNLayers()-1);i++){
-    for(size_t j=0;j<p2ptree.GetNNodes(p2ptree.GetNLayers()-1,i);j++){
-      AddressValue remoteAddress(InetSocketAddress(p2ptree.GetParentAddress(p2ptree.GetNLayers()-1,i,j,midServer), sinkPort));
-      clientHelper.SetAttribute("Remote",remoteAddress);
-      AddressValue actuator(InetSocketAddress(p2ptree.GetIpv4Address(p2ptree.GetNLayers()-1,i,j,1), sinkPort));
-      clientHelper.SetAttribute("Actuator",actuator);
-      ApplicationContainer clientApp;
-      clientApp.Add(clientHelper.Install(p2ptree.GetNode(p2ptree.GetNLayers()-1,i,j)));
-      ApplicationContainer serverApp;
-      serverApp.Add(serverHelper.Install(p2ptree.GetNode(p2ptree.GetNLayers()-1,i,j)));
-      Ptr<Socket> ns3TcpSocket = Socket::CreateSocket(p2ptree.GetNode(p2ptree.GetNLayers()-1,i,j), TcpSocketFactory::GetTypeId());
-      clientApp.Get(0)->GetObject<MyOnOffApplication>()->SetSocket(ns3TcpSocket);
-      clientApp.Start(Seconds(1.0));
-      clientApp.Stop(Seconds(SIM_TIME));
-      serverApp.Start(Seconds(1.0));
-      serverApp.Stop(Seconds(SIM_TIME+10));
-      ns3TcpSockets.push_back(ns3TcpSocket);
-    }
-  }
+  MyOrchestrator orch(p2ptree);
+  uint8_t first = orch.AddServerHelper(100.0,Ipv4Address::GetAny());
+  uint8_t second = orch.AddServerHelper(100.0,Ipv4Address::GetAny());
+  orch.CreateChaine(second, first);
+  orch.Assign();
 
   AsciiTraceHelper asciiTraceHelper;
 
@@ -208,7 +179,7 @@ main(int argc, char *argv[])
   Config::ConnectWithoutContext ("/NodeList/0/ApplicationList/*/$ns3::MyTcpServer/Tx", MakeBoundCallback(&TxTracer, txStream));
 
   Simulator::Stop(Seconds(SIM_TIME+10));
-  //config.ConfigureAttributes();
+  config.ConfigureAttributes();
   Simulator::Run();
   Simulator::Destroy();
 
