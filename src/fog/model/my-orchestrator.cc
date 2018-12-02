@@ -62,29 +62,29 @@ void MyOrchestrator::Assign(){
   Algorithm();
 }
 
-uint8_t MyOrchestrator::AddServerHelper(double meanCalctime, Ipv4Address allowAddress){
+uint32_t MyOrchestrator::AddServerHelper(double meanCalctime, Ipv4Address allowAddress){
   MyTcpServerHelper myTcpServerHelper(m_protocol, m_clientPktSize, meanCalctime, InetSocketAddress(allowAddress,m_sinkPort));
   m_serverHelper[m_currentServerNum] = myTcpServerHelper;
   m_currentServerNum++;
   return m_currentServerNum-1;
 }
 
-uint8_t MyOrchestrator::GetCurrentNServer(){
+uint32_t MyOrchestrator::GetCurrentNServer(){
   return m_currentServerNum;
 }
 
-void MyOrchestrator::CreateChaine(uint8_t fromServerIndex, uint8_t toServerIndex){
+void MyOrchestrator::CreateChaine(uint32_t fromServerIndex, uint32_t toServerIndex){
   m_chaine[fromServerIndex] = toServerIndex;
 }
 
 void MyOrchestrator::Algorithm(){
   AssignServer(0,0);
-  AssignServer(1,1);
-  m_firstServer = 1;
+  AssignServer(1,2);
+  m_firstServer = 2;
   AssignClient();
 }
 
-void MyOrchestrator::AssignServer(uint8_t serverIndex, uint8_t nLayer){
+void MyOrchestrator::AssignServer(uint32_t serverIndex, uint32_t nLayer){
   for(size_t i=0;i<m_p2pHelper.GetNGroups(nLayer);i++){
     for(size_t j=0;j<m_p2pHelper.GetNNodes(nLayer,i);j++){
       auto chaine = m_chaine.find(serverIndex);
@@ -95,7 +95,7 @@ void MyOrchestrator::AssignServer(uint8_t serverIndex, uint8_t nLayer){
         meanTime << "ns3::ExponentialRandomVariable[Mean=" << 100.0*(nLayer+1) << "]";
         m_serverHelper[serverIndex].SetAttribute("CalcTime", StringValue(meanTime.str()));
       }
-      ApplicationContainer servers = m_p2pHelper.InstallApp(m_serverHelper[serverIndex], nLayer);
+      ApplicationContainer servers = m_p2pHelper.InstallApp(m_serverHelper[serverIndex], nLayer, i, j);
       servers.Start(Seconds(0.1));
       servers.Stop(Seconds(m_simTime+5));
     }
