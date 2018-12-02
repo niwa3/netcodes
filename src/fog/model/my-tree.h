@@ -81,6 +81,8 @@ public:
 
   template < class T > ApplicationContainer InstallApp(T& app, uint32_t nLayer);
 
+  template < class T > ApplicationContainer InstallApp(T& app, uint32_t nLayer, uint32_t nGroup, uint32_t nNode);
+
 private:
   std::vector<std::vector<NodeContainer>> m_layers;
   std::vector<NetDeviceContainer> m_devices;
@@ -97,6 +99,12 @@ template < class T > ApplicationContainer PointToPointTreeHelper::InstallApp(T& 
       appCon.Add(app.Install(GetNode(nLayer,i,j)));
     }
   }
+  return appCon;
+}
+
+template < class T > ApplicationContainer PointToPointTreeHelper::InstallApp(T& app, uint32_t nLayer, uint32_t nGroup, uint32_t nNode){
+  ApplicationContainer appCon;
+  appCon.Add(app.Install(GetNode(nLayer,nGroup,nNode)));
   return appCon;
 }
 

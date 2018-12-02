@@ -41,15 +41,15 @@ public:
 
 private:
   PointToPointTreeHelper m_p2pHelper;
-  std::map<uint8_t, MyTcpServerHelper> m_serverHelper;
-  std::map<uint8_t, uint8_t> m_serverPlace;
-  std::map<uint8_t, uint8_t> m_chaine;
+  std::map<uint32_t, MyTcpServerHelper> m_serverHelper;
+  std::map<uint32_t, uint32_t> m_serverPlace;
+  std::map<uint32_t, uint32_t> m_chaine;
 
   int m_simTime;
   int m_sinkPort;
   std::string m_protocol;
 
-  uint8_t m_currentServerNum;
+  uint32_t m_currentServerNum;
   std::string m_clientOnTime;
   std::string m_clientOffTime;
   uint32_t m_clientPktSize;
@@ -59,14 +59,14 @@ private:
 public:
   template <typename T> void SetAttribute(std::string name, T value);
   void Assign();
-  uint8_t AddServerHelper(double meanCalctime, Ipv4Address allowAddress);
-  uint8_t GetCurrentNServer();
-  void CreateChaine(uint8_t fromServerIndex, uint8_t toServerIndex);
+  uint32_t AddServerHelper(double meanCalctime, Ipv4Address allowAddress);
+  uint32_t GetCurrentNServer();
+  void CreateChaine(uint32_t fromServerIndex, uint32_t toServerIndex);
 
 private:
   void Algorithm();
   void AssignClient();
-  void AssignServer(uint8_t serverIndex, uint8_t nLayer);
+  void AssignServer(uint32_t serverIndex, uint32_t nLayer);
 
 };
 
