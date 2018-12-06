@@ -61,10 +61,6 @@ MyOnOffApplication::GetTypeId(void)
                    AddressValue(),
                    MakeAddressAccessor(&MyOnOffApplication::m_actuator),
                    MakeAddressChecker())
-    .AddAttribute("OnTime", "A RandomVariableStream used to pick the duration of the 'On' state.",
-                   StringValue("ns3::ConstantRandomVariable[Constant=1.0]"),
-                   MakePointerAccessor(&MyOnOffApplication::m_onTime),
-                   MakePointerChecker <RandomVariableStream>())
     .AddAttribute("OffTime", "A RandomVariableStream used to pick the duration of the 'Off' state.",
                    StringValue("ns3::ConstantRandomVariable[Constant=1.0]"),
                    MakePointerAccessor(&MyOnOffApplication::m_offTime),
@@ -134,7 +130,6 @@ int64_t
 MyOnOffApplication::AssignStreams(int64_t stream)
 {
   NS_LOG_FUNCTION(this << stream);
-  m_onTime->SetStream(stream);
   m_offTime->SetStream(stream + 1);
   return 2;
 }
@@ -234,7 +229,6 @@ void MyOnOffApplication::StartSending()
     ScheduleStartEvent();
   }
   //ScheduleNextTx();  // Schedule the send packet event
-  //ScheduleStopEvent();
 }
 
 void MyOnOffApplication::StopSending()
@@ -267,23 +261,13 @@ void MyOnOffApplication::ScheduleNextTx()
     }
 }
 
-//ScheduleStartEventとScheduleStopEventがOnOffを決めてるっぽいね
 void MyOnOffApplication::ScheduleStartEvent()
 {  // Schedules the event to start sending data(switch to the "On" state)
   NS_LOG_FUNCTION(this);
 
-  Time offInterval = Seconds(m_offTime->GetValue());
+  Time offInterval = MicroSeconds(m_offTime->GetValue());
   NS_LOG_LOGIC("start at " << offInterval);
   m_startStopEvent = Simulator::Schedule(offInterval, &MyOnOffApplication::StartSending, this);
-}
-
-void MyOnOffApplication::ScheduleStopEvent()
-{  // Schedules the event to stop sending data(switch to "Off" state)
-  NS_LOG_FUNCTION(this);
-
-  Time onInterval = Seconds(m_onTime->GetValue());
-  NS_LOG_LOGIC("stop at " << onInterval);
-  m_startStopEvent = Simulator::Schedule(onInterval, &MyOnOffApplication::StopSending, this);
 }
 
 void MyOnOffApplication::SendPacket()

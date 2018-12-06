@@ -50,37 +50,32 @@ private:
   std::string m_protocol;
 
   uint32_t m_currentServerNum;
-  std::string m_clientOnTime;
   std::string m_clientOffTime;
   uint32_t m_clientPktSize;
   std::string m_clientDataRate;
   uint32_t m_firstServer;
 
 public:
-  template <typename T> void SetAttribute(std::string name, T value);
   void Assign();
   uint32_t AddServerHelper(double meanCalctime, Ipv4Address allowAddress);
   uint32_t GetCurrentNServer();
   void CreateChaine(uint32_t fromServerIndex, uint32_t toServerIndex);
+  void SetSimulationTime(int time);
+  void SetSinkPort(int port);
+  void SetClientOffTime(std::string offtime);
+  void SetClientPktSize(uint32_t pktSize);
 
 private:
-  void Algorithm();
   void AssignClient();
   void AssignServer(uint32_t serverIndex, uint32_t nLayer);
+  double GetAccessDelay(uint32_t pktSize, DataRate bw, double lambda, double mu);
+  double GetBottleDelay(uint32_t pktSize, DataRate bbw, DataRate abw, double lambda, double mu);
+  double GetProcessDelay(double lambda, double mu);
+  double GetErlangC(DataRate bbw, DataRate abw, double rho, double mu);
+  uint32_t Factorial(uint32_t m);
+  void Algorithm();
 
 };
-
-template <typename T> void MyOrchestrator::SetAttribute(std::string name, T value){
-  if(name=="SimTime"){
-    m_simTime = value;
-  }
-  else if(name=="SinkPort"){
-    m_sinkPort = value;
-  }
-  else if(name=="ClientOnTime"){
-    m_clientOnTime = value;
-  }
-}
 
 } // namespace ns3
 

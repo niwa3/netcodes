@@ -178,10 +178,6 @@ private:
    */
   void ScheduleStartEvent();
   /**
-   * \brief Schedule the next Off period start
-   */
-  void ScheduleStopEvent();
-  /**
    * \brief Handle a Connection Succeed event
    * \param socket the connected socket
    */

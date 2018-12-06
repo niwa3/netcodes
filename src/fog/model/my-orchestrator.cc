@@ -19,6 +19,7 @@
 #include <cmath>
 #include <iostream>
 #include <sstream>
+#include <cmath>
 
 // ns3 includes
 #include "ns3/log.h"
@@ -45,7 +46,6 @@ MyOrchestrator::MyOrchestrator(PointToPointTreeHelper p2pHelper)
     m_sinkPort(8080),
     m_protocol("ns3::TcpSocketFactory"),
     m_currentServerNum(0),
-    m_clientOnTime("ns3::ConstantRandomVariable[Constant=1]"),
     m_clientOffTime("ns3::ExponentialRandomVariable[Mean=1]"),
     m_clientPktSize(5096),
     m_clientDataRate("1Mb/s"),
@@ -77,11 +77,44 @@ void MyOrchestrator::CreateChaine(uint32_t fromServerIndex, uint32_t toServerInd
   m_chaine[fromServerIndex] = toServerIndex;
 }
 
-void MyOrchestrator::Algorithm(){
-  AssignServer(0,0);
-  AssignServer(1,2);
-  m_firstServer = 2;
-  AssignClient();
+void MyOrchestrator::SetSimulationTime(int time){
+  m_simTime = time;
+}
+
+void MyOrchestrator::SetSinkPort(int port){
+  m_sinkPort = port;
+}
+
+void MyOrchestrator::SetClientOffTime(std::string offtime){
+  m_clientOffTime = offtime;
+}
+
+void MyOrchestrator::SetClientPktSize(uint32_t pktSize){
+  m_clientPktSize = pktSize;
+}
+
+void MyOrchestrator::AssignClient(){
+  MyOnOffHelper clientHelper(m_protocol, Address());
+  clientHelper.SetAttribute("OffTime", StringValue(m_clientOffTime));
+  clientHelper.SetAttribute("PacketSize", UintegerValue(m_clientPktSize));
+  MyReceiveServerHelper serverHelper(m_protocol, m_clientPktSize, InetSocketAddress(Ipv4Address::GetAny(), m_sinkPort));
+
+  for(size_t i=0;i<m_p2pHelper.GetNGroups(m_p2pHelper.GetNLayers()-1);i++){
+    for(size_t j=0;j<m_p2pHelper.GetNNodes(m_p2pHelper.GetNLayers()-1,i);j++){
+      AddressValue remoteAddress(InetSocketAddress(m_p2pHelper.GetParentAddress(m_p2pHelper.GetNLayers()-1,i,j,m_firstServer), m_sinkPort));
+      clientHelper.SetAttribute("Remote",remoteAddress);
+      AddressValue actuator(InetSocketAddress(m_p2pHelper.GetIpv4Address(m_p2pHelper.GetNLayers()-1,i,j,1), m_sinkPort));
+      clientHelper.SetAttribute("Actuator",actuator);
+      ApplicationContainer clientApp;
+      clientApp.Add(clientHelper.Install(m_p2pHelper.GetNode(m_p2pHelper.GetNLayers()-1,i,j)));
+      ApplicationContainer serverApp;
+      serverApp.Add(serverHelper.Install(m_p2pHelper.GetNode(m_p2pHelper.GetNLayers()-1,i,j)));
+      clientApp.Start(Seconds(1.0));
+      clientApp.Stop(Seconds(m_simTime));
+      serverApp.Start(Seconds(1.0));
+      serverApp.Stop(Seconds(m_simTime+10));
+    }
+  }
 }
 
 void MyOrchestrator::AssignServer(uint32_t serverIndex, uint32_t nLayer){
@@ -102,30 +135,50 @@ void MyOrchestrator::AssignServer(uint32_t serverIndex, uint32_t nLayer){
   }
 }
 
-void MyOrchestrator::AssignClient(){
-  MyOnOffHelper clientHelper(m_protocol, Address());
-  clientHelper.SetAttribute("OnTime", StringValue(m_clientOnTime));
-  clientHelper.SetAttribute("OffTime", StringValue(m_clientOffTime));
-  clientHelper.SetAttribute("PacketSize", UintegerValue(m_clientPktSize));
-  clientHelper.SetAttribute("DataRate", DataRateValue(DataRate(m_clientDataRate)));
-  MyReceiveServerHelper serverHelper(m_protocol, m_clientPktSize, InetSocketAddress(Ipv4Address::GetAny(), m_sinkPort));
+double MyOrchestrator::GetAccessDelay(uint32_t pktSize, DataRate bw, double lambda, double mu){
+  double rho = lambda/mu;
+  double t = 1/(mu*(1-rho));
+  return t;
+}
 
-  for(size_t i=0;i<m_p2pHelper.GetNGroups(m_p2pHelper.GetNLayers()-1);i++){
-    for(size_t j=0;j<m_p2pHelper.GetNNodes(m_p2pHelper.GetNLayers()-1,i);j++){
-      AddressValue remoteAddress(InetSocketAddress(m_p2pHelper.GetParentAddress(m_p2pHelper.GetNLayers()-1,i,j,m_firstServer), m_sinkPort));
-      clientHelper.SetAttribute("Remote",remoteAddress);
-      AddressValue actuator(InetSocketAddress(m_p2pHelper.GetIpv4Address(m_p2pHelper.GetNLayers()-1,i,j,1), m_sinkPort));
-      clientHelper.SetAttribute("Actuator",actuator);
-      ApplicationContainer clientApp;
-      clientApp.Add(clientHelper.Install(m_p2pHelper.GetNode(m_p2pHelper.GetNLayers()-1,i,j)));
-      ApplicationContainer serverApp;
-      serverApp.Add(serverHelper.Install(m_p2pHelper.GetNode(m_p2pHelper.GetNLayers()-1,i,j)));
-      clientApp.Start(Seconds(1.0));
-      clientApp.Stop(Seconds(m_simTime));
-      serverApp.Start(Seconds(1.0));
-      serverApp.Stop(Seconds(m_simTime+10));
-    }
+double MyOrchestrator::GetBottleDelay(uint32_t pktSize, DataRate bbw, DataRate abw, double lambda, double mu){
+  uint32_t m = (bbw*Seconds(1))/(abw*Seconds(1));
+  double rho = lambda/mu;
+  double t = 1.0*((GetErlangC(bbw,abw,rho,mu)/(mu*(1.0-rho)))*(1.0-((bbw*Seconds(1))/(abw*Seconds(1))-m)*(1.0-rho)));
+  return t;
+}
+
+double MyOrchestrator::GetProcessDelay(double lambda, double mu){
+  double rho = lambda/mu;
+  double t = rho/((1-rho)*lambda);
+  return t;
+}
+
+double MyOrchestrator::GetErlangC(DataRate bbw, DataRate abw, double rho, double mu){
+  uint32_t m = (bbw*Seconds(1))/(abw*Seconds(1));
+  double a = (bbw*Seconds(1))*rho/(abw*Seconds(1));
+  double l = (std::pow(a,m)/Factorial(m))*(1/(1-rho));
+  double sum = 0;
+  for(uint32_t i=0; i<=m; i++){
+    sum += (static_cast<double>(std::pow(a,i))/static_cast<double>(Factorial(i)));
   }
+  double erlang = l/(sum+l);
+  return erlang;
+}
+
+uint32_t MyOrchestrator::Factorial(uint32_t m){
+  uint32_t sum = 1;
+  for(uint32_t i=1; i<=m; i++){
+    sum *= i;
+  }
+  return sum;
+}
+
+void MyOrchestrator::Algorithm(){
+  AssignServer(0,0);
+  AssignServer(1,2);
+  m_firstServer = 2;
+  AssignClient();
 }
 
 } // namespace ns3
