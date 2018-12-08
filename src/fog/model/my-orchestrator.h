@@ -74,6 +74,7 @@ private:
   double GetErlangC(DataRate bbw, DataRate abw, double rho, double mu);
   uint32_t Factorial(uint32_t m);
   void Algorithm();
+  void SetTracer();
 
 };
 

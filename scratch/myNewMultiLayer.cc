@@ -65,24 +65,10 @@ std::vector<std::string> stringSplit(const std::string &str, char sep)
   return v;
 }
 
-static void
-RxTracer(Ptr<OutputStreamWrapper> stream, Ptr<const Packet> packet, const Address& address)
-{
-  *stream->GetStream() << InetSocketAddress::ConvertFrom(address).GetIpv4() << " " << Simulator::Now().GetNanoSeconds() << " " << packet->GetSize() << std::endl;
-}
-
-static void
-TxTracer(Ptr<OutputStreamWrapper> stream, Ptr<const Packet> packet)
-{
-  *stream->GetStream() << Simulator::Now().GetNanoSeconds() << " " << packet->GetSize() << std::endl;
-}
-
 int
 main(int argc, char *argv[])
 {
   GtkConfigStore config;
-
-  //uint16_t sinkPort = 8080;
 
   std::string nodeNum = "1-1-5-20";
   std::string bands = "40Gbps-10Gbps-1Gbps";
@@ -127,60 +113,17 @@ main(int argc, char *argv[])
 
   Ipv4GlobalRoutingHelper::PopulateRoutingTables();
 
-  //std::string protocol = "ns3::TcpSocketFactory";
-
   MyOrchestrator orch(p2ptree);
   orch.SetClientOffTime("ns3::ExponentialRandomVariable[Mean=200000]");
   uint8_t first = orch.AddServerHelper(100.0,Ipv4Address::GetAny());
   uint8_t second = orch.AddServerHelper(100.0,Ipv4Address::GetAny());
+  uint8_t third = orch.AddServerHelper(100.0,Ipv4Address::GetAny());
   orch.CreateChaine(second, first);
+  orch.CreateChaine(third, second);
   orch.Assign();
 
-  AsciiTraceHelper asciiTraceHelper;
-
-  {
-    int i = 0;
-    for(size_t j=0;j<p2ptree.GetNNodes(p2ptree.GetNLayers()-1,i);j++){
-      uint32_t id = p2ptree.GetNode(p2ptree.GetNLayers()-1,i,j)->GetId();
-      std::stringstream txFile;
-      txFile << "myExampleTx-" << id << ".csv";
-      std::stringstream txPath;
-      txPath << "/NodeList/" << id << "/ApplicationList/*/$ns3::MyOnOffApplication/Tx";
-      Ptr<OutputStreamWrapper> txStream = asciiTraceHelper.CreateFileStream(txFile.str().c_str());
-      Config::ConnectWithoutContext(txPath.str().c_str(),MakeBoundCallback(&TxTracer, txStream));
-      std::stringstream rxFile;
-      rxFile << "myExampleRx-" << id << ".csv";
-      std::stringstream rxPath;
-      rxPath << "/NodeList/" << id << "/ApplicationList/*/$ns3::MyReceiveServer/Rx";
-      Ptr<OutputStreamWrapper> rxStream = asciiTraceHelper.CreateFileStream(rxFile.str().c_str());
-      Config::ConnectWithoutContext(rxPath.str().c_str(),MakeBoundCallback(&RxTracer, rxStream));
-    }
-  }
-
-  {
-    int i = 0;
-    int j = 0;
-    uint32_t id = p2ptree.GetNode(midServer,i,j)->GetId();
-    std::stringstream txFile;
-    txFile << "myExampleTxMidServer-" << id << ".csv";
-    std::stringstream txPath;
-    txPath << "/NodeList/" << id << "/ApplicationList/*/$ns3::MyTcpServer/Tx";
-    Ptr<OutputStreamWrapper> txStream = asciiTraceHelper.CreateFileStream(txFile.str().c_str());
-    Config::ConnectWithoutContext (txPath.str().c_str(), MakeBoundCallback(&TxTracer, txStream));
-    std::stringstream rxFile;
-    rxFile << "myExampleRxMidServer-" << id << ".csv";
-    std::stringstream rxPath;
-    rxPath << "/NodeList/" << id << "/ApplicationList/*/$ns3::MyTcpServer/Rx";
-    Ptr<OutputStreamWrapper> rxStream = asciiTraceHelper.CreateFileStream(rxFile.str().c_str());
-    Config::ConnectWithoutContext (rxPath.str().c_str(), MakeBoundCallback(&RxTracer, rxStream));
-  }
-
-  Ptr<OutputStreamWrapper> rxStream = asciiTraceHelper.CreateFileStream("myExampleRxServer.csv");
-  Config::ConnectWithoutContext ("/NodeList/0/ApplicationList/*/$ns3::MyTcpServer/Rx", MakeBoundCallback(&RxTracer, rxStream));
-  Ptr<OutputStreamWrapper> txStream = asciiTraceHelper.CreateFileStream("myExampleTxServer.csv");
-  Config::ConnectWithoutContext ("/NodeList/0/ApplicationList/*/$ns3::MyTcpServer/Tx", MakeBoundCallback(&TxTracer, txStream));
-
   Simulator::Stop(Seconds(SIM_TIME+10));
+  //config.ConfigureAttributes();
   Simulator::Run();
   Simulator::Destroy();
 
