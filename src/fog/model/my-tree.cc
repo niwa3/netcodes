@@ -250,7 +250,7 @@ std::vector<uint32_t> PointToPointTreeHelper::GetChildrenId(uint32_t nodeId, uin
 }
 
 std::vector<Ipv4Address> PointToPointTreeHelper::GetChildrenAddress(uint32_t nLayer, uint32_t nGroup, uint32_t nNode, uint32_t childLayer){
-  return GetChildrenAddress(GetNodeId(nLayer,nGroup,nNode),childLayer);
+  return GetChildrenAddress(GetNodeId(nLayer,nGroup,nNode),childLayer-nLayer);
 }
 
 std::vector<Ipv4Address> PointToPointTreeHelper::GetChildrenAddress(uint32_t nodeId, uint32_t nDown){

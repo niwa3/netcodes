@@ -70,10 +70,6 @@ MyTcpServer::GetTypeId (void)
                    StringValue("ns3::ExponentialRandomVariable[Mean=1.0]"),
                    MakePointerAccessor(&MyTcpServer::m_calctime),
                    MakePointerChecker <RandomVariableStream>())
-    .AddAttribute("NextService", "The address of the next service",
-                   AddressValue(),
-                   MakeAddressAccessor(&MyTcpServer::m_peer),
-                   MakeAddressChecker())
     .AddTraceSource ("Rx",
                      "A packet has been received",
                      MakeTraceSourceAccessor (&MyTcpServer::m_rxTrace),
@@ -94,7 +90,6 @@ MyTcpServer::MyTcpServer ()
   NS_LOG_FUNCTION (this);
   m_socket = 0;
   m_totalRx = 0;
-  m_nextServiceSocket = 0;
   m_jobQueue.SetMaxPackets(1000);
 }
 
@@ -128,7 +123,6 @@ void MyTcpServer::DoDispose (void)
   NS_LOG_FUNCTION (this);
   m_socket = 0;
   m_socketList.clear ();
-  m_nextServiceSocket = 0;
 
   // chain up
   Application::DoDispose ();
@@ -166,8 +160,18 @@ void MyTcpServer::StartApplication ()    // Called at time specified by Start
   }
   m_nodeAddress = GetNode()->GetObject<Ipv4>()->GetAddress(1,0).GetLocal();
 
-  if(!m_peer.IsInvalid()){
-    m_nextServiceSocket = CreateSocket(m_peer);
+  for(auto i: m_addrTable){
+    NS_LOG_DEBUG("MyTcpServer(" << m_nodeAddress << ") >> start to create socket (end node: " << i.first <<" )");
+    if(!static_cast<Address>(i.second).IsInvalid()){
+      auto socketItr = m_nextServiceSocket.find(static_cast<Address>(i.second));
+      if(socketItr==m_nextServiceSocket.end()){
+        NS_LOG_DEBUG("MyTcpServer(" << m_nodeAddress << ") >> create socket to " << i.second);
+        m_nextServiceSocket[static_cast<Address>(i.second)] = CreateSocket(static_cast<Address>(i.second));
+      }
+      else{
+        NS_LOG_DEBUG("MyTcpServer(" << m_nodeAddress << ") >> already has a socket to " << i.second);
+      }
+    }
   }
 }
 
@@ -188,16 +192,16 @@ void MyTcpServer::StopApplication ()     // Called at time specified by Stop
   Simulator::Cancel(m_sendEvent);
   NS_LOG_FUNCTION (this);
   while(!m_socketList.empty ()) //these are accepted sockets, close them
-    {
-      Ptr<Socket> acceptedSocket = m_socketList.front ();
-      m_socketList.pop_front ();
-      acceptedSocket->Close ();
-    }
+  {
+    Ptr<Socket> acceptedSocket = m_socketList.front ();
+    m_socketList.pop_front ();
+    acceptedSocket->Close ();
+  }
   if (m_socket) 
-    {
-      m_socket->Close ();
-      m_socket->SetRecvCallback (MakeNullCallback<void, Ptr<Socket> > ());
-    }
+  {
+    m_socket->Close ();
+    m_socket->SetRecvCallback (MakeNullCallback<void, Ptr<Socket> > ());
+  }
 }
 
 void MyTcpServer::HandleRead (Ptr<Socket> socket)
@@ -206,45 +210,44 @@ void MyTcpServer::HandleRead (Ptr<Socket> socket)
   Ptr<Packet> packet;
   Address from;
   while ((packet = socket->RecvFrom (from)))
-    {
-      NS_LOG_DEBUG("MyTcpServe(" << m_nodeAddress << ") >> received packet " << packet->GetSize() << " from " << from << " " << __FILE__);
-      if (packet->GetSize () == 0)
-        { //EOF
-          break;
-        }
-      m_totalRx += packet->GetSize ();
-      if(!buff.count(from)){
-        buff[from] = packet;
+  {
+    NS_LOG_DEBUG("MyTcpServe(" << m_nodeAddress << ") >> received packet " << packet->GetSize() << " from " << from << " " << __FILE__);
+    if (packet->GetSize () == 0)
+      { //EOF
+        break;
       }
-      else{
-        buff[from]->AddAtEnd(packet);
-      }
-      NS_LOG_DEBUG("from " << InetSocketAddress::ConvertFrom(from).GetIpv4() << " size " << buff[from]->GetSize());
-      if(buff[from]->GetSize()>=m_pktSize){
-        Ptr<Packet> receivedPacket = buff[from]->CreateFragment(0,m_pktSize);
-        buff[from]->RemoveAtStart(m_pktSize);
-        m_rxTrace(receivedPacket, from);
-        //std::cout<<m_nodeAddress<<ParseData(PacketDeserialize(receivedPacket))<<std::endl;
-        NS_LOG_DEBUG("MyTcpServer("<<m_nodeAddress<<") >> receive a packet from "<<InetSocketAddress::ConvertFrom(from).GetIpv4());
-        if(m_jobQueue.IsEmpty() && !m_isBusy){
-          m_isBusy = true;
-          Time calcInterval = MicroSeconds(m_calctime->GetValue());
-          m_serviceTrace(calcInterval);
-          NS_LOG_DEBUG("MyTcpServer("<<m_nodeAddress<<") >> start...");
-          if(!m_nextServiceSocket){
-            m_sendEvent = Simulator::Schedule (calcInterval, &MyTcpServer::Response, this, receivedPacket);
-          }
-          else{
-            m_sendEvent = Simulator::Schedule (calcInterval, &MyTcpServer::SendNext, this, receivedPacket);
-          }
+    m_totalRx += packet->GetSize ();
+    if(!buff.count(from)){
+      buff[from] = packet;
+    }
+    else{
+      buff[from]->AddAtEnd(packet);
+    }
+    NS_LOG_DEBUG("from " << InetSocketAddress::ConvertFrom(from).GetIpv4() << " size " << buff[from]->GetSize());
+    if(buff[from]->GetSize()>=m_pktSize){
+      Ptr<Packet> receivedPacket = buff[from]->CreateFragment(0,m_pktSize);
+      buff[from]->RemoveAtStart(m_pktSize);
+      m_rxTrace(receivedPacket, from);
+      NS_LOG_DEBUG("MyTcpServer("<<m_nodeAddress<<") >> receive a packet from "<<InetSocketAddress::ConvertFrom(from).GetIpv4());
+      if(m_jobQueue.IsEmpty() && !m_isBusy){
+        m_isBusy = true;
+        Time calcInterval = MicroSeconds(m_calctime->GetValue());
+        m_serviceTrace(calcInterval);
+        NS_LOG_DEBUG("MyTcpServer("<<m_nodeAddress<<") >> start...");
+        if(m_nextServiceSocket.empty()){
+          m_sendEvent = Simulator::Schedule (calcInterval, &MyTcpServer::Response, this, receivedPacket);
         }
         else{
-          Ptr<MyAppQueueItem> newJob = Create<MyAppQueueItem>(receivedPacket, socket);
-          NS_LOG_DEBUG("MyTcpServer("<<m_nodeAddress<<") >> enqueue... (size: "<<m_jobQueue.GetCurrentSize()<<"/"<<m_jobQueue.GetMaxPackets()<<")");
-          m_jobQueue.Enqueue(newJob);
+          m_sendEvent = Simulator::Schedule (calcInterval, &MyTcpServer::SendNext, this, receivedPacket);
         }
       }
+      else{
+        Ptr<MyAppQueueItem> newJob = Create<MyAppQueueItem>(receivedPacket, socket);
+        NS_LOG_DEBUG("MyTcpServer("<<m_nodeAddress<<") >> enqueue... (size: "<<m_jobQueue.GetCurrentSize()<<"/"<<m_jobQueue.GetMaxPackets()<<")");
+        m_jobQueue.Enqueue(newJob);
+      }
     }
+  }
 }
 
 void MyTcpServer::Response(Ptr<Packet> packet){
@@ -253,7 +256,7 @@ void MyTcpServer::Response(Ptr<Packet> packet){
   //you can add the logic to create response packet
   Ptr<Packet> rePacket = packet;
 
-  Address peer = ParseData(PacketDeserialize(packet));
+  Address peer = ParseActuator(PacketDeserialize(packet));
 
   NS_LOG_DEBUG("MyTcpServer("<<m_nodeAddress<<") >> get actuator address "<<InetSocketAddress::ConvertFrom(peer).GetIpv4()<<" port "<<InetSocketAddress::ConvertFrom(peer).GetPort());
 
@@ -289,9 +292,13 @@ void MyTcpServer::SendNext(Ptr<Packet> packet){
   //TODO
   //you can add the logic to create response packet
   //Ptr<Packet> rePacket = Create<Packet>(m_pktSize);
+  NS_LOG_DEBUG("MyTcpServer("<<m_nodeAddress<<") >> parse packet");
+  Address next = ParseSource(PacketDeserialize(packet));
+  NS_LOG_DEBUG("MyTcpServer("<<m_nodeAddress<<") >> start to send a packet from "<< InetSocketAddress::ConvertFrom(next).GetIpv4());
   Ptr<Packet> rePacket = packet;
-  int sendSize = m_nextServiceSocket->Send(rePacket);
-  NS_LOG_DEBUG("MyTcpServer("<<m_nodeAddress<<") >> send a packet to "<<InetSocketAddress::ConvertFrom(m_peer).GetIpv4()<<" size: "<<sendSize);
+  int sendSize = m_nextServiceSocket[m_addrTable[next]]->Send(rePacket);
+
+  NS_LOG_DEBUG("MyTcpServer("<<m_nodeAddress<<") >> send a packet to "<<InetSocketAddress::ConvertFrom(m_addrTable[next]).GetIpv4()<<" size: "<<sendSize);
   m_txTrace(rePacket);
   m_isBusy = false;
   if(m_jobQueue.IsEmpty()){
@@ -336,6 +343,10 @@ bool MyTcpServer::HandleRequest (Ptr<Socket> s, const Address& address)
   return true;
 }
 
+void MyTcpServer::SetAddressTable(std::map<Address, Address> addrTable){
+  m_addrTable = addrTable;
+}
+
 std::string MyTcpServer::PacketDeserialize(Ptr<Packet> p){
   uint8_t buf[m_pktSize];
   p->CopyData(buf, m_pktSize);
@@ -344,11 +355,18 @@ std::string MyTcpServer::PacketDeserialize(Ptr<Packet> p){
   return text.str();
 }
 
-Address MyTcpServer::ParseData(std::string data){
+Address MyTcpServer::ParseActuator(std::string data){
   std::string err;
   auto json = json11::Json::parse(data, err);
   Ipv4Address aAddr(json["ActuatorId"]["Address"].string_value().c_str());
   return InetSocketAddress(aAddr, json["ActuatorId"]["Port"].int_value());
+}
+
+Address MyTcpServer::ParseSource(std::string data){
+  std::string err;
+  auto json = json11::Json::parse(data, err);
+  Ipv4Address aAddr(json["NodeId"]["Address"].string_value().c_str());
+  return InetSocketAddress(aAddr);
 }
 
 Ptr<Socket> MyTcpServer::CreateSocket(Address peer)

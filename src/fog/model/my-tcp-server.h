@@ -52,7 +52,9 @@ public:
   Ptr<Socket> GetListeningSocket (void) const;
 
   std::list<Ptr<Socket> > GetAcceptedSockets (void) const;
- 
+
+  void SetAddressTable(std::map<Address, Address> addrTable);
+
 protected:
   virtual void DoDispose (void);
 private:
@@ -81,8 +83,8 @@ private:
   bool m_isBusy; //flag that server is now busy or not
   Ipv4Address m_nodeAddress; //own node address
   MyQueue m_jobQueue;
-  Ptr<Socket> m_nextServiceSocket;
-  Address m_peer;
+  std::map<Address, Ptr<Socket>> m_nextServiceSocket;
+  std::map<Address, Address> m_addrTable;
   std::map<Address, Ptr<Socket>> m_peerSockets;
   EventId m_sendEvent;
 
@@ -92,7 +94,8 @@ private:
   bool HandleRequest(Ptr<Socket> socket, const Address& from);
 
   std::string PacketDeserialize(Ptr<Packet> packet);
-  Address ParseData(std::string data);
+  Address ParseActuator(std::string data);
+  Address ParseSource(std::string data);
   Ptr<Socket> CreateSocket(Address peer);
 
   void ConnectionSucceeded(Ptr<Socket> socket);

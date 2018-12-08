@@ -122,17 +122,42 @@ void MyOrchestrator::AssignServer(uint32_t serverIndex, uint32_t nLayer){
     for(size_t j=0;j<m_p2pHelper.GetNNodes(nLayer,i);j++){
       auto chaine = m_chaine.find(serverIndex);
       if(chaine != m_chaine.end()){
-        AddressValue nextService = AddressValue(InetSocketAddress(m_p2pHelper.GetParentAddress(nLayer,i,j,m_serverPlace[m_chaine[serverIndex]]),m_sinkPort));
-        m_serverHelper[serverIndex].SetAttribute("NextService", nextService);
+        std::map<Address, Address> addrTable;
+        if(m_serverPlace[m_chaine[serverIndex]]<nLayer){
+          Address nextService = InetSocketAddress(m_p2pHelper.GetParentAddress(nLayer,i,j,m_serverPlace[m_chaine[serverIndex]]),m_sinkPort);
+          std::vector<Ipv4Address> children = m_p2pHelper.GetChildrenAddress(nLayer,i,j,m_p2pHelper.GetNLayers()-1);
+          for(Ipv4Address i: children){
+            NS_LOG_DEBUG("MyOrchestrator >> make addrTable "<<InetSocketAddress(i));
+            addrTable[InetSocketAddress(i)] = nextService;
+          }
+        }
+        else{
+          std::vector<uint32_t> nextServiceList = m_p2pHelper.GetChildrenId(nLayer,i,j,m_serverPlace[m_chaine[serverIndex]]);
+          for(uint32_t i: nextServiceList){
+            std::vector<Ipv4Address> children = m_p2pHelper.GetChildrenAddress(i, m_p2pHelper.GetNLayers()-1-m_serverPlace[m_chaine[serverIndex]]);
+            for(Ipv4Address j: children){
+              NS_LOG_DEBUG("MyOrchestrator >> make addrTable from "<<InetSocketAddress(m_p2pHelper.GetIpv4Address(i,1))<<" to "<<InetSocketAddress(j));
+              addrTable[InetSocketAddress(j)] = InetSocketAddress(m_p2pHelper.GetIpv4Address(i,1),m_sinkPort);
+            }
+          }
+        }
         std::stringstream meanTime;
         meanTime << "ns3::ExponentialRandomVariable[Mean=" << 100.0*(nLayer+1) << "]";
         m_serverHelper[serverIndex].SetAttribute("CalcTime", StringValue(meanTime.str()));
+        ApplicationContainer servers = m_p2pHelper.InstallApp(m_serverHelper[serverIndex], nLayer, i, j);
+        NS_LOG_DEBUG("size: "<<addrTable.size());
+        servers.Get(0)->GetObject<MyTcpServer>()->SetAddressTable(addrTable);
+        servers.Start(Seconds(0.1));
+        servers.Stop(Seconds(m_simTime+5));
       }
-      ApplicationContainer servers = m_p2pHelper.InstallApp(m_serverHelper[serverIndex], nLayer, i, j);
-      servers.Start(Seconds(0.1));
-      servers.Stop(Seconds(m_simTime+5));
+      else{
+        ApplicationContainer servers = m_p2pHelper.InstallApp(m_serverHelper[serverIndex], nLayer, i, j);
+        servers.Start(Seconds(0.1));
+        servers.Stop(Seconds(m_simTime+5));
+      }
     }
   }
+  m_serverPlace[serverIndex] = nLayer;
 }
 
 double MyOrchestrator::GetAccessDelay(uint32_t pktSize, DataRate bw, double lambda, double mu){
@@ -175,8 +200,9 @@ uint32_t MyOrchestrator::Factorial(uint32_t m){
 }
 
 void MyOrchestrator::Algorithm(){
-  AssignServer(0,0);
-  AssignServer(1,2);
+  AssignServer(0,3);
+  AssignServer(1,1);
+  AssignServer(2,2);
   m_firstServer = 2;
   AssignClient();
 }
