@@ -19,6 +19,7 @@
 #include <cmath>
 #include <iostream>
 #include <sstream>
+#include <cmath>
 
 // ns3 includes
 #include "ns3/log.h"
@@ -40,12 +41,24 @@ namespace ns3 {
 
 NS_LOG_COMPONENT_DEFINE ("MyOrchestrator");
 
+static void
+RxTracer(Ptr<OutputStreamWrapper> stream, Ptr<const Packet> packet, const Address& address)
+{
+  *stream->GetStream() << InetSocketAddress::ConvertFrom(address).GetIpv4() << " " << Simulator::Now().GetNanoSeconds() << " " << packet->GetSize() << std::endl;
+}
+
+static void
+TxTracer(Ptr<OutputStreamWrapper> stream, Ptr<const Packet> packet)
+{
+  *stream->GetStream() << Simulator::Now().GetNanoSeconds() << " " << packet->GetSize() << std::endl;
+}
+
+
 MyOrchestrator::MyOrchestrator(PointToPointTreeHelper p2pHelper)
   : m_simTime(180),
     m_sinkPort(8080),
     m_protocol("ns3::TcpSocketFactory"),
     m_currentServerNum(0),
-    m_clientOnTime("ns3::ConstantRandomVariable[Constant=1]"),
     m_clientOffTime("ns3::ExponentialRandomVariable[Mean=1]"),
     m_clientPktSize(5096),
     m_clientDataRate("1Mb/s"),
@@ -60,10 +73,11 @@ MyOrchestrator::~MyOrchestrator ()
 
 void MyOrchestrator::Assign(){
   Algorithm();
+  SetTracer();
 }
 
 uint32_t MyOrchestrator::AddServerHelper(double meanCalctime, Ipv4Address allowAddress){
-  MyTcpServerHelper myTcpServerHelper(m_protocol, m_clientPktSize, meanCalctime, InetSocketAddress(allowAddress,m_sinkPort));
+  MyTcpServerHelper myTcpServerHelper(m_protocol, m_clientPktSize, meanCalctime, InetSocketAddress(allowAddress,m_sinkPort+m_currentServerNum));
   m_serverHelper[m_currentServerNum] = myTcpServerHelper;
   m_currentServerNum++;
   return m_currentServerNum-1;
@@ -77,42 +91,31 @@ void MyOrchestrator::CreateChaine(uint32_t fromServerIndex, uint32_t toServerInd
   m_chaine[fromServerIndex] = toServerIndex;
 }
 
-void MyOrchestrator::Algorithm(){
-  AssignServer(0,0);
-  AssignServer(1,2);
-  m_firstServer = 2;
-  AssignClient();
+void MyOrchestrator::SetSimulationTime(int time){
+  m_simTime = time;
 }
 
-void MyOrchestrator::AssignServer(uint32_t serverIndex, uint32_t nLayer){
-  for(size_t i=0;i<m_p2pHelper.GetNGroups(nLayer);i++){
-    for(size_t j=0;j<m_p2pHelper.GetNNodes(nLayer,i);j++){
-      auto chaine = m_chaine.find(serverIndex);
-      if(chaine != m_chaine.end()){
-        AddressValue nextService = AddressValue(InetSocketAddress(m_p2pHelper.GetParentAddress(nLayer,i,j,m_serverPlace[m_chaine[serverIndex]]),m_sinkPort));
-        m_serverHelper[serverIndex].SetAttribute("NextService", nextService);
-        std::stringstream meanTime;
-        meanTime << "ns3::ExponentialRandomVariable[Mean=" << 100.0*(nLayer+1) << "]";
-        m_serverHelper[serverIndex].SetAttribute("CalcTime", StringValue(meanTime.str()));
-      }
-      ApplicationContainer servers = m_p2pHelper.InstallApp(m_serverHelper[serverIndex], nLayer, i, j);
-      servers.Start(Seconds(0.1));
-      servers.Stop(Seconds(m_simTime+5));
-    }
-  }
+void MyOrchestrator::SetSinkPort(int port){
+  m_sinkPort = port;
+}
+
+void MyOrchestrator::SetClientOffTime(std::string offtime){
+  m_clientOffTime = offtime;
+}
+
+void MyOrchestrator::SetClientPktSize(uint32_t pktSize){
+  m_clientPktSize = pktSize;
 }
 
 void MyOrchestrator::AssignClient(){
   MyOnOffHelper clientHelper(m_protocol, Address());
-  clientHelper.SetAttribute("OnTime", StringValue(m_clientOnTime));
   clientHelper.SetAttribute("OffTime", StringValue(m_clientOffTime));
   clientHelper.SetAttribute("PacketSize", UintegerValue(m_clientPktSize));
-  clientHelper.SetAttribute("DataRate", DataRateValue(DataRate(m_clientDataRate)));
   MyReceiveServerHelper serverHelper(m_protocol, m_clientPktSize, InetSocketAddress(Ipv4Address::GetAny(), m_sinkPort));
 
   for(size_t i=0;i<m_p2pHelper.GetNGroups(m_p2pHelper.GetNLayers()-1);i++){
     for(size_t j=0;j<m_p2pHelper.GetNNodes(m_p2pHelper.GetNLayers()-1,i);j++){
-      AddressValue remoteAddress(InetSocketAddress(m_p2pHelper.GetParentAddress(m_p2pHelper.GetNLayers()-1,i,j,m_firstServer), m_sinkPort));
+      AddressValue remoteAddress(InetSocketAddress(m_p2pHelper.GetParentAddress(m_p2pHelper.GetNLayers()-1,i,j,m_firstServer), m_sinkPort+m_currentServerNum-1));
       clientHelper.SetAttribute("Remote",remoteAddress);
       AddressValue actuator(InetSocketAddress(m_p2pHelper.GetIpv4Address(m_p2pHelper.GetNLayers()-1,i,j,1), m_sinkPort));
       clientHelper.SetAttribute("Actuator",actuator);
@@ -124,6 +127,143 @@ void MyOrchestrator::AssignClient(){
       clientApp.Stop(Seconds(m_simTime));
       serverApp.Start(Seconds(1.0));
       serverApp.Stop(Seconds(m_simTime+10));
+    }
+  }
+}
+
+void MyOrchestrator::AssignServer(uint32_t serverIndex, uint32_t nLayer){
+  for(size_t i=0;i<m_p2pHelper.GetNGroups(nLayer);i++){
+    for(size_t j=0;j<m_p2pHelper.GetNNodes(nLayer,i);j++){
+      auto chaine = m_chaine.find(serverIndex);
+      if(chaine != m_chaine.end()){
+        std::map<Address, Address> addrTable;
+        if(m_serverPlace[m_chaine[serverIndex]]<nLayer){
+          Address nextService = InetSocketAddress(m_p2pHelper.GetParentAddress(nLayer,i,j,m_serverPlace[m_chaine[serverIndex]]),m_sinkPort+m_chaine[serverIndex]);
+          std::vector<Ipv4Address> children = m_p2pHelper.GetChildrenAddress(nLayer,i,j,m_p2pHelper.GetNLayers()-1);
+          for(Ipv4Address i: children){
+            NS_LOG_DEBUG("MyOrchestrator >> make addrTable "<<InetSocketAddress(i));
+            addrTable[InetSocketAddress(i)] = nextService;
+          }
+        }
+        else{
+          std::vector<uint32_t> nextServiceList = m_p2pHelper.GetChildrenId(nLayer,i,j,m_serverPlace[m_chaine[serverIndex]]);
+          for(uint32_t i: nextServiceList){
+            std::vector<Ipv4Address> children = m_p2pHelper.GetChildrenAddress(i, m_p2pHelper.GetNLayers()-1-m_serverPlace[m_chaine[serverIndex]]);
+            for(Ipv4Address j: children){
+              NS_LOG_DEBUG("MyOrchestrator >> make addrTable from "<<InetSocketAddress(m_p2pHelper.GetIpv4Address(i,1))<<" to "<<InetSocketAddress(j));
+              addrTable[InetSocketAddress(j)] = InetSocketAddress(m_p2pHelper.GetIpv4Address(i,1),m_sinkPort+m_chaine[serverIndex]);
+            }
+          }
+        }
+        std::stringstream meanTime;
+        meanTime << "ns3::ExponentialRandomVariable[Mean=" << 100.0*(nLayer+1) << "]";
+        m_serverHelper[serverIndex].SetAttribute("CalcTime", StringValue(meanTime.str()));
+        ApplicationContainer servers = m_p2pHelper.InstallApp(m_serverHelper[serverIndex], nLayer, i, j);
+        NS_LOG_DEBUG("size: "<<addrTable.size());
+        servers.Get(0)->GetObject<MyTcpServer>()->SetAddressTable(addrTable);
+        servers.Start(Seconds(0.1));
+        servers.Stop(Seconds(m_simTime+5));
+      }
+      else{
+        std::stringstream meanTime;
+        meanTime << "ns3::ExponentialRandomVariable[Mean=" << 100.0*(nLayer+1) << "]";
+        m_serverHelper[serverIndex].SetAttribute("CalcTime", StringValue(meanTime.str()));
+        ApplicationContainer servers = m_p2pHelper.InstallApp(m_serverHelper[serverIndex], nLayer, i, j);
+        servers.Start(Seconds(0.1));
+        servers.Stop(Seconds(m_simTime+5));
+      }
+    }
+  }
+  m_serverPlace[serverIndex] = nLayer;
+}
+
+double MyOrchestrator::GetAccessDelay(uint32_t pktSize, DataRate bw, double lambda, double mu){
+  double rho = lambda/mu;
+  double t = 1/(mu*(1-rho));
+  return t;
+}
+
+double MyOrchestrator::GetBottleDelay(uint32_t pktSize, DataRate bbw, DataRate abw, double lambda, double mu){
+  uint32_t m = (bbw*Seconds(1))/(abw*Seconds(1));
+  double rho = lambda/mu;
+  double t = 1.0*((GetErlangC(bbw,abw,rho,mu)/(mu*(1.0-rho)))*(1.0-((bbw*Seconds(1))/(abw*Seconds(1))-m)*(1.0-rho)));
+  return t;
+}
+
+double MyOrchestrator::GetProcessDelay(double lambda, double mu){
+  double rho = lambda/mu;
+  double t = rho/((1-rho)*lambda);
+  return t;
+}
+
+double MyOrchestrator::GetErlangC(DataRate bbw, DataRate abw, double rho, double mu){
+  uint32_t m = (bbw*Seconds(1))/(abw*Seconds(1));
+  double a = (bbw*Seconds(1))*rho/(abw*Seconds(1));
+  double l = (std::pow(a,m)/Factorial(m))*(1/(1-rho));
+  double sum = 0;
+  for(uint32_t i=0; i<=m; i++){
+    sum += (static_cast<double>(std::pow(a,i))/static_cast<double>(Factorial(i)));
+  }
+  double erlang = l/(sum+l);
+  return erlang;
+}
+
+uint32_t MyOrchestrator::Factorial(uint32_t m){
+  uint32_t sum = 1;
+  for(uint32_t i=1; i<=m; i++){
+    sum *= i;
+  }
+  return sum;
+}
+
+void MyOrchestrator::Algorithm(){
+  AssignServer(0,3);
+  AssignServer(1,1);
+  AssignServer(2,3);
+  m_firstServer = 3;
+  AssignClient();
+}
+
+void MyOrchestrator::SetTracer(){
+  AsciiTraceHelper asciiTraceHelper;
+  {
+    int i = 0;
+    for(size_t j=0;j<m_p2pHelper.GetNNodes(m_p2pHelper.GetNLayers()-1,i);j++){
+      uint32_t id = m_p2pHelper.GetNode(m_p2pHelper.GetNLayers()-1,i,j)->GetId();
+      std::stringstream txFile;
+      txFile << "myEndTx-" << id << ".csv";
+      std::stringstream txPath;
+      txPath << "/NodeList/" << id << "/ApplicationList/*/$ns3::MyOnOffApplication/Tx";
+      Ptr<OutputStreamWrapper> txStream = asciiTraceHelper.CreateFileStream(txFile.str().c_str());
+      Config::ConnectWithoutContext(txPath.str().c_str(),MakeBoundCallback(&TxTracer, txStream));
+      std::stringstream rxFile;
+      rxFile << "myEndRx-" << id << ".csv";
+      std::stringstream rxPath;
+      rxPath << "/NodeList/" << id << "/ApplicationList/*/$ns3::MyReceiveServer/Rx";
+      Ptr<OutputStreamWrapper> rxStream = asciiTraceHelper.CreateFileStream(rxFile.str().c_str());
+      Config::ConnectWithoutContext(rxPath.str().c_str(),MakeBoundCallback(&RxTracer, rxStream));
+    }
+  }
+
+  {
+    int i = 0;
+    int j = 0;
+    std::vector<uint32_t> counter(m_p2pHelper.GetNLayers(),0);
+    for(auto k: m_serverPlace){
+      uint32_t id = m_p2pHelper.GetNode(k.second,i,j)->GetId();
+      std::stringstream txFile;
+      txFile << "myServer"<<k.first<<"Tx-" << id << ".csv";
+      std::stringstream txPath;
+      txPath << "/NodeList/" << id << "/ApplicationList/"<<counter[k.second]<<"/$ns3::MyTcpServer/Tx";
+      Ptr<OutputStreamWrapper> txStream = asciiTraceHelper.CreateFileStream(txFile.str().c_str());
+      Config::ConnectWithoutContext (txPath.str().c_str(), MakeBoundCallback(&TxTracer, txStream));
+      std::stringstream rxFile;
+      rxFile << "myServer"<<k.first<<"Rx-" << id << ".csv";
+      std::stringstream rxPath;
+      rxPath << "/NodeList/" << id << "/ApplicationList/"<<counter[k.second]<<"/$ns3::MyTcpServer/Rx";
+      Ptr<OutputStreamWrapper> rxStream = asciiTraceHelper.CreateFileStream(rxFile.str().c_str());
+      Config::ConnectWithoutContext (rxPath.str().c_str(), MakeBoundCallback(&RxTracer, rxStream));
+      counter[k.second] += 1;
     }
   }
 }

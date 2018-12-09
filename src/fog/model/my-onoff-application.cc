@@ -61,10 +61,6 @@ MyOnOffApplication::GetTypeId(void)
                    AddressValue(),
                    MakeAddressAccessor(&MyOnOffApplication::m_actuator),
                    MakeAddressChecker())
-    .AddAttribute("OnTime", "A RandomVariableStream used to pick the duration of the 'On' state.",
-                   StringValue("ns3::ConstantRandomVariable[Constant=1.0]"),
-                   MakePointerAccessor(&MyOnOffApplication::m_onTime),
-                   MakePointerChecker <RandomVariableStream>())
     .AddAttribute("OffTime", "A RandomVariableStream used to pick the duration of the 'Off' state.",
                    StringValue("ns3::ConstantRandomVariable[Constant=1.0]"),
                    MakePointerAccessor(&MyOnOffApplication::m_offTime),
@@ -134,7 +130,6 @@ int64_t
 MyOnOffApplication::AssignStreams(int64_t stream)
 {
   NS_LOG_FUNCTION(this << stream);
-  m_onTime->SetStream(stream);
   m_offTime->SetStream(stream + 1);
   return 2;
 }
@@ -161,23 +156,22 @@ MyOnOffApplication::StartApplication() // Called at time specified by Start
   }
 
   if(Inet6SocketAddress::IsMatchingType(m_peer))
+  {
+    if(m_socket->Bind6() == -1)
     {
-      if(m_socket->Bind6() == -1)
-        {
-          NS_FATAL_ERROR("Failed to bind socket");
-        }
+      NS_FATAL_ERROR("Failed to bind socket");
     }
+  }
   else if(InetSocketAddress::IsMatchingType(m_peer) ||
-           PacketSocketAddress::IsMatchingType(m_peer))
+          PacketSocketAddress::IsMatchingType(m_peer))
+  {
+    if(m_socket->Bind() == -1)
     {
-      if(m_socket->Bind() == -1)
-        {
-          NS_FATAL_ERROR("Failed to bind socket");
-        }
+      NS_FATAL_ERROR("Failed to bind socket");
     }
+  }
   m_socket->Connect(m_peer);
   m_socket->SetAllowBroadcast(true);
-  //m_socket->ShutdownRecv();
 
   m_socket->SetConnectCallback(
     MakeCallback(&MyOnOffApplication::ConnectionSucceeded, this),
@@ -185,12 +179,6 @@ MyOnOffApplication::StartApplication() // Called at time specified by Start
 
   m_cbrRateFailSafe = m_cbrRate;
 
-  // Insure no pending event
-  CancelEvents();
-  // If we are not yet connected, there is nothing to do here
-  // The ConnectionComplete upcall will start timers at that time
-  //if(!m_connected) return;
-  ScheduleStartEvent();
 }
 
 void MyOnOffApplication::StopApplication() // Called at time specified by Stop
@@ -233,8 +221,6 @@ void MyOnOffApplication::StartSending()
   if(!m_bulksend){
     ScheduleStartEvent();
   }
-  //ScheduleNextTx();  // Schedule the send packet event
-  //ScheduleStopEvent();
 }
 
 void MyOnOffApplication::StopSending()
@@ -267,23 +253,13 @@ void MyOnOffApplication::ScheduleNextTx()
     }
 }
 
-//ScheduleStartEventとScheduleStopEventがOnOffを決めてるっぽいね
 void MyOnOffApplication::ScheduleStartEvent()
 {  // Schedules the event to start sending data(switch to the "On" state)
   NS_LOG_FUNCTION(this);
 
-  Time offInterval = Seconds(m_offTime->GetValue());
+  Time offInterval = MicroSeconds(m_offTime->GetValue());
   NS_LOG_LOGIC("start at " << offInterval);
   m_startStopEvent = Simulator::Schedule(offInterval, &MyOnOffApplication::StartSending, this);
-}
-
-void MyOnOffApplication::ScheduleStopEvent()
-{  // Schedules the event to stop sending data(switch to "Off" state)
-  NS_LOG_FUNCTION(this);
-
-  Time onInterval = Seconds(m_onTime->GetValue());
-  NS_LOG_LOGIC("stop at " << onInterval);
-  m_startStopEvent = Simulator::Schedule(onInterval, &MyOnOffApplication::StopSending, this);
 }
 
 void MyOnOffApplication::SendPacket()
@@ -295,7 +271,7 @@ void MyOnOffApplication::SendPacket()
   m_txTrace(packet);
   int sendSize = m_socket->Send(packet);
   NS_LOG_DEBUG("HttpClient (" << m_clientAddress << ") >> Sending request for "
-              << " to server (" << InetSocketAddress::ConvertFrom(m_peer).GetIpv4() << ") size: "<<sendSize << ".");
+              << "server (" << InetSocketAddress::ConvertFrom(m_peer).GetIpv4() << ") size: "<<sendSize << ".");
   m_totBytes += m_pktSize;
   m_lastStartTime = Simulator::Now();
   m_residualBits = 0;
@@ -316,6 +292,8 @@ void MyOnOffApplication::ConnectionSucceeded(Ptr<Socket> socket)
   NS_LOG_DEBUG ("HttpClient (" << m_clientAddress << ") >> Server accepted connection request!");
   m_connected = true;
   socket->SetRecvCallback(MakeCallback (&MyOnOffApplication::HandleReceive, this));
+  CancelEvents();
+  ScheduleStartEvent();
 }
 
 void MyOnOffApplication::ConnectionFailed(Ptr<Socket> socket)

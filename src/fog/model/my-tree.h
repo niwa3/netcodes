@@ -32,64 +32,72 @@
 
 namespace ns3 {
 
-/**
- * \defgroup point-to-point-layout Point-to-Point Layout Helpers
- *
- */
+class LinkContainer{
+public:
+  LinkContainer();
+  LinkContainer(uint32_t parent);
+  ~LinkContainer();
+  void SetParent(uint32_t parent);
+  void SetChildren(std::vector<uint32_t> children);
+  void AddChild(uint32_t child);
+  uint32_t GetParent();
+  uint32_t GetNthChild(uint32_t child);
+  size_t GetNChildren();
+  uint32_t GetChild(uint32_t nth);
+  std::vector<uint32_t> GetChildren();
+  bool IsChildEmpty();
+  static LinkContainer CreateLinkContainer();
+  static LinkContainer CreateLinkContainer(uint32_t parent);
 
-/**
- * \ingroup point-to-point-layout
- *
- * \brief A helper to make it easier to create a star topology
- * with PointToPoint links
- */
+private:
+  uint32_t m_parent;
+  std::vector<uint32_t> m_children;
+};
+
 class PointToPointTreeHelper
 {
 public:
-  /**
-   * Create a PointToPointTreeHelper in order to easily create
-   * star topologies using p2p links
-   *
-   * \param numSpokes the number of links attached to 
-   *        the hub node, creating a total of 
-   *        numSpokes + 1 nodes
-   *
-   * \param p2pHelper the link helper for p2p links, 
-   *        used to link nodes together
-   */
   PointToPointTreeHelper (std::vector<int> nodeNums, std::vector<std::string> bandwidth, std::vector<std::string> delays);
   PointToPointTreeHelper();
 
   ~PointToPointTreeHelper ();
 
 public:
-  Ptr<Node> GetNode (uint32_t nLayer, uint32_t nGroup, uint32_t nNode) const;
+  Ptr<Node> GetNode (uint32_t nLayer, uint32_t nGroup, uint32_t nNode);
 
-  Ipv4Address GetIpv4Address (uint32_t nLayer, uint32_t nGroup, uint32_t nNode, uint32_t nInterface) const;
+  Ipv4Address GetIpv4Address (uint32_t nLayer, uint32_t nGroup, uint32_t nNode, uint32_t nInterface);
+  Ipv4Address GetIpv4Address (uint32_t nodeId, uint32_t nInterface);
 
   void InstallStack (InternetStackHelper stack);
 
   void AssignIpv4Addresses (Ipv4AddressHelper address);
 
   size_t GetNLayers();
-
   size_t GetNGroups(uint32_t nLayer);
-
   size_t GetNNodes(uint32_t nLayer, uint32_t nGroup);
 
+  uint32_t GetParentId(uint32_t nLayer, uint32_t nGroup, uint32_t nNode, uint32_t parentLayer);
+  uint32_t GetParentId(uint32_t nodeId, uint32_t nUp);
   Ipv4Address GetParentAddress(uint32_t nLayer, uint32_t nGroup, uint32_t nNode, uint32_t parentLayer);
+  Ipv4Address GetParentAddress(uint32_t nodeId, uint32_t nUp);
+
+  std::vector<uint32_t> GetChildrenId(uint32_t nLayer, uint32_t nGroup, uint32_t nNode, uint32_t childLayer);
+  std::vector<uint32_t> GetChildrenId(uint32_t nodeId, uint32_t nDown);
+  std::vector<Ipv4Address> GetChildrenAddress(uint32_t nLayer, uint32_t nGroup, uint32_t nNode, uint32_t childLayer);
+  std::vector<Ipv4Address> GetChildrenAddress(uint32_t nodeId, uint32_t nDown);
+
+  std::vector<LinkContainer> GetLinkList();
+
+  uint32_t GetNodeId(uint32_t nLayer, uint32_t nGroup, uint32_t nNode);
 
   template < class T > ApplicationContainer InstallApp(T& app, uint32_t nLayer);
-
   template < class T > ApplicationContainer InstallApp(T& app, uint32_t nLayer, uint32_t nGroup, uint32_t nNode);
 
 private:
-  std::vector<std::vector<NodeContainer>> m_layers;
-  std::vector<NetDeviceContainer> m_devices;
-  std::vector<Ipv4InterfaceContainer> m_interfaces;
   std::vector<int> m_nodeNums;
   std::vector<std::string> m_bandwidths;
   std::vector<std::string> m_delays;
+  std::vector<LinkContainer> m_link;
 };
 
 template < class T > ApplicationContainer PointToPointTreeHelper::InstallApp(T& app, uint32_t nLayer){
