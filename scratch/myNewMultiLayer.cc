@@ -73,13 +73,11 @@ main(int argc, char *argv[])
   std::string nodeNum = "1-1-5-20";
   std::string bands = "40Gbps-10Gbps-1Gbps";
   std::string delays = "10ms-5ms-2ms";
-  uint32_t midServer = 1;
 
   CommandLine cmd;
   cmd.AddValue ("node", "the number of nodes of each layer (\"Cloud Server ... Router ... GW\") (ex. \"1-2-10\")", nodeNum);
   cmd.AddValue ("net", "the bandwidth of net of each layer (\"Cloud-Server Server-Router ... Router-GW\") (ex. \"40Gbps-10Gbps-1Gbps\")", bands);
   cmd.AddValue ("delay", "the delay of net of each layer (\"Cloud-Server Server-Router ... Router-GW\") (ex. \"10ms-5ms-1ms\")", delays);
-  cmd.AddValue ("midServer", "location of middle server (ex. \"1\")", midServer);
   cmd.Parse(argc, argv);
 
   const std::vector<int> NODE_NUM = stringSplitToInt(nodeNum, '-');
@@ -120,10 +118,11 @@ main(int argc, char *argv[])
   uint8_t third = orch.AddServerHelper(100.0,Ipv4Address::GetAny());
   orch.CreateChaine(second, first);
   orch.CreateChaine(third, second);
+  orch.SetPlace(0,3,3);
   orch.Assign();
 
   Simulator::Stop(Seconds(SIM_TIME+10));
-  //config.ConfigureAttributes();
+  config.ConfigureAttributes();
   Simulator::Run();
   Simulator::Destroy();
 
