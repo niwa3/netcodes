@@ -73,11 +73,19 @@ main(int argc, char *argv[])
   std::string nodeNum = "1-1-5-20";
   std::string bands = "40Gbps-10Gbps-1Gbps";
   std::string delays = "10ms-5ms-2ms";
+  uint32_t top = 0;
+  uint32_t mid = 0;
+  uint32_t end = 0;
+  std::string path="/root/result";
 
   CommandLine cmd;
   cmd.AddValue ("node", "the number of nodes of each layer (\"Cloud Server ... Router ... GW\") (ex. \"1-2-10\")", nodeNum);
   cmd.AddValue ("net", "the bandwidth of net of each layer (\"Cloud-Server Server-Router ... Router-GW\") (ex. \"40Gbps-10Gbps-1Gbps\")", bands);
   cmd.AddValue ("delay", "the delay of net of each layer (\"Cloud-Server Server-Router ... Router-GW\") (ex. \"10ms-5ms-1ms\")", delays);
+  cmd.AddValue ("top", "top server place (ex. 0)", top);
+  cmd.AddValue ("mid", "mid server place (ex. 1)", mid);
+  cmd.AddValue ("end", "end server place (ex. 1)", end);
+  cmd.AddValue ("path", "path of trace file (ex. /root/result)", mid);
   cmd.Parse(argc, argv);
 
   const std::vector<int> NODE_NUM = stringSplitToInt(nodeNum, '-');
@@ -118,7 +126,8 @@ main(int argc, char *argv[])
   uint8_t third = orch.AddServerHelper(100.0,Ipv4Address::GetAny());
   orch.CreateChaine(second, first);
   orch.CreateChaine(third, second);
-  orch.SetPlace(0,3,3);
+  orch.SetPlace(top,mid,end);
+  orch.SetPath(path);
   orch.Assign();
 
   Simulator::Stop(Seconds(SIM_TIME+10));
