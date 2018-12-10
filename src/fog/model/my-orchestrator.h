@@ -55,6 +55,10 @@ private:
   std::string m_clientDataRate;
   uint32_t m_firstServer;
 
+  uint32_t m_top;
+  uint32_t m_mid;
+  uint32_t m_end;
+
 public:
   void Assign();
   uint32_t AddServerHelper(double meanCalctime, Ipv4Address allowAddress);
@@ -64,6 +68,7 @@ public:
   void SetSinkPort(int port);
   void SetClientOffTime(std::string offtime);
   void SetClientPktSize(uint32_t pktSize);
+  void SetPlace(uint32_t top, uint32_t mid, uint32_t end);
 
 private:
   void AssignClient();

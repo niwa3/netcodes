@@ -140,18 +140,26 @@ void MyOrchestrator::AssignServer(uint32_t serverIndex, uint32_t nLayer){
         if(m_serverPlace[m_chaine[serverIndex]]<nLayer){
           Address nextService = InetSocketAddress(m_p2pHelper.GetParentAddress(nLayer,i,j,m_serverPlace[m_chaine[serverIndex]]),m_sinkPort+m_chaine[serverIndex]);
           std::vector<Ipv4Address> children = m_p2pHelper.GetChildrenAddress(nLayer,i,j,m_p2pHelper.GetNLayers()-1);
-          for(Ipv4Address i: children){
-            NS_LOG_DEBUG("MyOrchestrator >> make addrTable "<<InetSocketAddress(i));
-            addrTable[InetSocketAddress(i)] = nextService;
+          for(Ipv4Address k: children){
+            NS_LOG_DEBUG("MyOrchestrator >> make addrTable "<<InetSocketAddress(k));
+            addrTable[InetSocketAddress(k)] = nextService;
+          }
+        }
+        else if(m_serverPlace[m_chaine[serverIndex]]==nLayer){
+          Address nextService = InetSocketAddress(m_p2pHelper.GetIpv4Address(nLayer,i,j,0),m_sinkPort+m_chaine[serverIndex]);
+          std::vector<Ipv4Address> children = m_p2pHelper.GetChildrenAddress(nLayer,i,j,m_p2pHelper.GetNLayers()-1);
+          for(Ipv4Address k: children){
+            NS_LOG_DEBUG("MyOrchestrator >> make addrTable "<<InetSocketAddress(k));
+            addrTable[InetSocketAddress(k)] = nextService;
           }
         }
         else{
           std::vector<uint32_t> nextServiceList = m_p2pHelper.GetChildrenId(nLayer,i,j,m_serverPlace[m_chaine[serverIndex]]);
-          for(uint32_t i: nextServiceList){
-            std::vector<Ipv4Address> children = m_p2pHelper.GetChildrenAddress(i, m_p2pHelper.GetNLayers()-1-m_serverPlace[m_chaine[serverIndex]]);
-            for(Ipv4Address j: children){
-              NS_LOG_DEBUG("MyOrchestrator >> make addrTable from "<<InetSocketAddress(m_p2pHelper.GetIpv4Address(i,1))<<" to "<<InetSocketAddress(j));
-              addrTable[InetSocketAddress(j)] = InetSocketAddress(m_p2pHelper.GetIpv4Address(i,1),m_sinkPort+m_chaine[serverIndex]);
+          for(uint32_t k: nextServiceList){
+            std::vector<Ipv4Address> children = m_p2pHelper.GetChildrenAddress(k, m_p2pHelper.GetNLayers()-1-m_serverPlace[m_chaine[serverIndex]]);
+            for(Ipv4Address l: children){
+              NS_LOG_DEBUG("MyOrchestrator >> make addrTable from "<<InetSocketAddress(m_p2pHelper.GetIpv4Address(k,1))<<" to "<<InetSocketAddress(l));
+              addrTable[InetSocketAddress(l)] = InetSocketAddress(m_p2pHelper.GetIpv4Address(k,1),m_sinkPort+m_chaine[serverIndex]);
             }
           }
         }
@@ -159,7 +167,7 @@ void MyOrchestrator::AssignServer(uint32_t serverIndex, uint32_t nLayer){
         meanTime << "ns3::ExponentialRandomVariable[Mean=" << 100.0*(nLayer+1) << "]";
         m_serverHelper[serverIndex].SetAttribute("CalcTime", StringValue(meanTime.str()));
         ApplicationContainer servers = m_p2pHelper.InstallApp(m_serverHelper[serverIndex], nLayer, i, j);
-        NS_LOG_DEBUG("size: "<<addrTable.size());
+        NS_LOG_DEBUG("address: "<<m_p2pHelper.GetIpv4Address(nLayer,i,j,1)<<" size: "<<addrTable.size());
         servers.Get(0)->GetObject<MyTcpServer>()->SetAddressTable(addrTable);
         servers.Start(Seconds(0.1));
         servers.Stop(Seconds(m_simTime+5));
@@ -217,10 +225,10 @@ uint32_t MyOrchestrator::Factorial(uint32_t m){
 }
 
 void MyOrchestrator::Algorithm(){
-  AssignServer(0,3);
-  AssignServer(1,1);
-  AssignServer(2,3);
-  m_firstServer = 3;
+  AssignServer(0,m_top);
+  AssignServer(1,m_mid);
+  AssignServer(2,m_end);
+  m_firstServer = m_end;
   AssignClient();
 }
 
@@ -266,6 +274,12 @@ void MyOrchestrator::SetTracer(){
       counter[k.second] += 1;
     }
   }
+}
+
+void MyOrchestrator::SetPlace(uint32_t top, uint32_t mid, uint32_t end){
+  m_top = top;
+  m_mid = mid;
+  m_end = end;
 }
 
 } // namespace ns3
