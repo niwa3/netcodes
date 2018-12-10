@@ -59,6 +59,8 @@ private:
   uint32_t m_mid;
   uint32_t m_end;
 
+  std::string m_path;
+
 public:
   void Assign();
   uint32_t AddServerHelper(double meanCalctime, Ipv4Address allowAddress);
@@ -69,6 +71,7 @@ public:
   void SetClientOffTime(std::string offtime);
   void SetClientPktSize(uint32_t pktSize);
   void SetPlace(uint32_t top, uint32_t mid, uint32_t end);
+  void SetPath(std::string path);
 
 private:
   void AssignClient();

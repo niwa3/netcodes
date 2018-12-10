@@ -239,13 +239,13 @@ void MyOrchestrator::SetTracer(){
     for(size_t j=0;j<m_p2pHelper.GetNNodes(m_p2pHelper.GetNLayers()-1,i);j++){
       uint32_t id = m_p2pHelper.GetNode(m_p2pHelper.GetNLayers()-1,i,j)->GetId();
       std::stringstream txFile;
-      txFile << "myEndTx-" << id << ".csv";
+      txFile << m_path << "myEndTx-" << id << ".csv";
       std::stringstream txPath;
       txPath << "/NodeList/" << id << "/ApplicationList/*/$ns3::MyOnOffApplication/Tx";
       Ptr<OutputStreamWrapper> txStream = asciiTraceHelper.CreateFileStream(txFile.str().c_str());
       Config::ConnectWithoutContext(txPath.str().c_str(),MakeBoundCallback(&TxTracer, txStream));
       std::stringstream rxFile;
-      rxFile << "myEndRx-" << id << ".csv";
+      rxFile << m_path << "myEndRx-" << id << ".csv";
       std::stringstream rxPath;
       rxPath << "/NodeList/" << id << "/ApplicationList/*/$ns3::MyReceiveServer/Rx";
       Ptr<OutputStreamWrapper> rxStream = asciiTraceHelper.CreateFileStream(rxFile.str().c_str());
@@ -253,33 +253,37 @@ void MyOrchestrator::SetTracer(){
     }
   }
 
-  {
-    int i = 0;
-    int j = 0;
-    std::vector<uint32_t> counter(m_p2pHelper.GetNLayers(),0);
-    for(auto k: m_serverPlace){
-      uint32_t id = m_p2pHelper.GetNode(k.second,i,j)->GetId();
-      std::stringstream txFile;
-      txFile << "myServer"<<k.first<<"Tx-" << id << ".csv";
-      std::stringstream txPath;
-      txPath << "/NodeList/" << id << "/ApplicationList/"<<counter[k.second]<<"/$ns3::MyTcpServer/Tx";
-      Ptr<OutputStreamWrapper> txStream = asciiTraceHelper.CreateFileStream(txFile.str().c_str());
-      Config::ConnectWithoutContext (txPath.str().c_str(), MakeBoundCallback(&TxTracer, txStream));
-      std::stringstream rxFile;
-      rxFile << "myServer"<<k.first<<"Rx-" << id << ".csv";
-      std::stringstream rxPath;
-      rxPath << "/NodeList/" << id << "/ApplicationList/"<<counter[k.second]<<"/$ns3::MyTcpServer/Rx";
-      Ptr<OutputStreamWrapper> rxStream = asciiTraceHelper.CreateFileStream(rxFile.str().c_str());
-      Config::ConnectWithoutContext (rxPath.str().c_str(), MakeBoundCallback(&RxTracer, rxStream));
-      counter[k.second] += 1;
-    }
-  }
+  //{
+  //  int i = 0;
+  //  int j = 0;
+  //  std::vector<uint32_t> counter(m_p2pHelper.GetNLayers(),0);
+  //  for(auto k: m_serverPlace){
+  //    uint32_t id = m_p2pHelper.GetNode(k.second,i,j)->GetId();
+  //    std::stringstream txFile;
+  //    txFile << path << "/myServer"<<k.first<<"Tx-" << id << ".csv";
+  //    std::stringstream txPath;
+  //    txPath << "/NodeList/" << id << "/ApplicationList/"<<counter[k.second]<<"/$ns3::MyTcpServer/Tx";
+  //    Ptr<OutputStreamWrapper> txStream = asciiTraceHelper.CreateFileStream(txFile.str().c_str());
+  //    Config::ConnectWithoutContext (txPath.str().c_str(), MakeBoundCallback(&TxTracer, txStream));
+  //    std::stringstream rxFile;
+  //    rxFile << path << "/myServer"<<k.first<<"Rx-" << id << ".csv";
+  //    std::stringstream rxPath;
+  //    rxPath << "/NodeList/" << id << "/ApplicationList/"<<counter[k.second]<<"/$ns3::MyTcpServer/Rx";
+  //    Ptr<OutputStreamWrapper> rxStream = asciiTraceHelper.CreateFileStream(rxFile.str().c_str());
+  //    Config::ConnectWithoutContext (rxPath.str().c_str(), MakeBoundCallback(&RxTracer, rxStream));
+  //    counter[k.second] += 1;
+  //  }
+  //}
 }
 
 void MyOrchestrator::SetPlace(uint32_t top, uint32_t mid, uint32_t end){
   m_top = top;
   m_mid = mid;
   m_end = end;
+}
+
+void MyOrchestrator::SetPath(std::string path){
+  m_path = path;
 }
 
 } // namespace ns3
