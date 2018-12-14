@@ -101,7 +101,8 @@ MyOnOffApplication::MyOnOffApplication()
     m_lastStartTime(Seconds(0)),
     m_totBytes(0),
     m_totalRx(0),
-    m_clientAddress(Ipv4Address())
+    m_clientAddress(Ipv4Address()),
+    m_totalPacket(0)
 {
   NS_LOG_FUNCTION(this);
 }
@@ -267,6 +268,7 @@ void MyOnOffApplication::SendPacket()
   NS_LOG_FUNCTION(this);
 
   NS_ASSERT(m_sendEvent.IsExpired());
+  m_totalPacket++;
   Ptr<Packet> packet = CreatePacket(m_pktSize, m_actuator);
   m_txTrace(packet);
   int sendSize = m_socket->Send(packet);
@@ -348,6 +350,7 @@ std::string MyOnOffApplication::CreateData(Address addr){
   json11::Json obj = json11::Json::object({
     {"NodeId", nodeId},
     {"ActuatorId", actId},
+    {"Total", m_totalPacket},
   });
   return obj.dump();
 }

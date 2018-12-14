@@ -165,6 +165,7 @@ PointToPointTreeHelper::AssignIpv4Addresses (Ipv4AddressHelper address)
 
   for(size_t nLayer=0; nLayer<(GetNLayers()-1); nLayer++){
     PointToPointHelper p2p;
+    p2p.SetQueue("ns3::DropTailQueue", "MaxSize", StringValue ("10000p"));
     p2p.SetDeviceAttribute("DataRate", StringValue(m_bandwidths[nLayer]));
     p2p.SetChannelAttribute("Delay", StringValue(m_delays[nLayer]));
     for(size_t nGroup=0; nGroup<GetNGroups(nLayer); nGroup++){
