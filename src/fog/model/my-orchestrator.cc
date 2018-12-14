@@ -225,10 +225,12 @@ uint32_t MyOrchestrator::Factorial(uint32_t m){
 }
 
 void MyOrchestrator::Algorithm(){
-  AssignServer(0,m_top);
-  AssignServer(1,m_mid);
-  AssignServer(2,m_end);
-  m_firstServer = m_end;
+  AssignServer(0,0);
+  //AssignServer(0,m_top);
+  //AssignServer(1,m_mid);
+  //AssignServer(2,m_end);
+  //m_firstServer = m_end;
+  m_firstServer = 0;
   AssignClient();
 }
 
@@ -239,13 +241,13 @@ void MyOrchestrator::SetTracer(){
     for(size_t j=0;j<m_p2pHelper.GetNNodes(m_p2pHelper.GetNLayers()-1,i);j++){
       uint32_t id = m_p2pHelper.GetNode(m_p2pHelper.GetNLayers()-1,i,j)->GetId();
       std::stringstream txFile;
-      txFile << m_path << "myEndTx-" << id << ".csv";
+      txFile << m_path << "/myEndTx-" << id << ".csv";
       std::stringstream txPath;
       txPath << "/NodeList/" << id << "/ApplicationList/*/$ns3::MyOnOffApplication/Tx";
       Ptr<OutputStreamWrapper> txStream = asciiTraceHelper.CreateFileStream(txFile.str().c_str());
       Config::ConnectWithoutContext(txPath.str().c_str(),MakeBoundCallback(&TxTracer, txStream));
       std::stringstream rxFile;
-      rxFile << m_path << "myEndRx-" << id << ".csv";
+      rxFile << m_path << "/myEndRx-" << id << ".csv";
       std::stringstream rxPath;
       rxPath << "/NodeList/" << id << "/ApplicationList/*/$ns3::MyReceiveServer/Rx";
       Ptr<OutputStreamWrapper> rxStream = asciiTraceHelper.CreateFileStream(rxFile.str().c_str());
