@@ -35,6 +35,7 @@
 #include "ns3/my-onoff-application-helper.h"
 #include "ns3/my-receive-server-helper.h"
 #include "ns3/my-tree.h"
+#include "ns3/json.h"
 #include "my-orchestrator.h"
 
 namespace ns3 {
@@ -44,13 +45,30 @@ NS_LOG_COMPONENT_DEFINE ("MyOrchestrator");
 static void
 RxTracer(Ptr<OutputStreamWrapper> stream, Ptr<const Packet> packet, const Address& address)
 {
-  *stream->GetStream() << InetSocketAddress::ConvertFrom(address).GetIpv4() << " " << Simulator::Now().GetNanoSeconds() << " " << packet->GetSize() << std::endl;
+  std::string err;
+  uint8_t buf[5096];
+  packet->CopyData(buf, 5096);
+  std::stringstream text;
+  text << buf;
+  NS_LOG_DEBUG(text.str());
+  auto json = json11::Json::parse(text.str(), err);
+  int total = json["Total"].int_value();
+  *stream->GetStream() << InetSocketAddress::ConvertFrom(address).GetIpv4() << " " << Simulator::Now().GetNanoSeconds() << " " << packet->GetSize() << " " << total << std::endl;
 }
 
 static void
 TxTracer(Ptr<OutputStreamWrapper> stream, Ptr<const Packet> packet)
 {
-  *stream->GetStream() << Simulator::Now().GetNanoSeconds() << " " << packet->GetSize() << std::endl;
+  std::string err;
+  uint8_t buf[5096];
+  packet->CopyData(buf, 5096);
+  std::stringstream text;
+  text << buf;
+  NS_LOG_DEBUG(text.str());
+  auto json = json11::Json::parse(text.str(), err);
+  int total = json["Total"].int_value();
+ 
+  *stream->GetStream() << Simulator::Now().GetNanoSeconds() << " " << packet->GetSize() << " " << total << std::endl;
 }
 
 
@@ -125,7 +143,7 @@ void MyOrchestrator::AssignClient(){
       serverApp.Add(serverHelper.Install(m_p2pHelper.GetNode(m_p2pHelper.GetNLayers()-1,i,j)));
       clientApp.Start(Seconds(1.0));
       clientApp.Stop(Seconds(m_simTime));
-      serverApp.Start(Seconds(1.0));
+      serverApp.Start(Seconds(0.1));
       serverApp.Stop(Seconds(m_simTime+10));
     }
   }

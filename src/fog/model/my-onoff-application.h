@@ -70,6 +70,8 @@ private:
   Ipv4Address m_clientAddress;
   Address m_actuator;
 
+  int m_totalPacket;
+
   Ptr<Packet> CreatePacket(uint32_t pktSize, Address peer);
 
   /// Traced Callback: transmitted packets.

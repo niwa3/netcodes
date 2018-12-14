@@ -29,6 +29,7 @@
 #include "ns3/my-tcp-server-helper.h"
 #include "ns3/my-receive-server-helper.h"
 #include "ns3/flow-monitor-helper.h"
+#include "ns3/gtk-config-store.h"
 
 #include "ns3/my-tree.h"
 #include "ns3/my-orchestrator.h"
@@ -67,6 +68,7 @@ std::vector<std::string> stringSplit(const std::string &str, char sep)
 int
 main(int argc, char *argv[])
 {
+  GtkConfigStore config;
   std::string nodeNum = "1-1-5-20";
   std::string bands = "40Gbps-10Gbps-1Gbps";
   std::string delays = "10ms-5ms-2ms";
@@ -134,6 +136,7 @@ main(int argc, char *argv[])
   orch.Assign();
 
   Simulator::Stop(Seconds(SIM_TIME+10));
+  config.ConfigureAttributes();
   Simulator::Run();
   Simulator::Destroy();
 
