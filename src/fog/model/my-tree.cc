@@ -108,7 +108,8 @@ PointToPointTreeHelper::PointToPointTreeHelper(std::vector<int> nodeNums, std::v
 
   NodeContainer top;
   top.Create(1);
-  m_link.push_back(LinkContainer::CreateLinkContainer());
+  //m_link.push_back(LinkContainer::CreateLinkContainer());
+  m_link.emplace_back();
 
   std::vector<NodeContainer> topLayer;
   topLayer.push_back(top);
@@ -119,7 +120,7 @@ PointToPointTreeHelper::PointToPointTreeHelper(std::vector<int> nodeNums, std::v
         NodeContainer nodes;
         nodes.Create(m_nodeNums[i]);
         for(int l=0; l<m_nodeNums[i]; l++){
-          m_link.push_back(LinkContainer::CreateLinkContainer(GetNode(i-1,j,k)->GetId()));
+          m_link.emplace_back(GetNode(i-1,j,k)->GetId());
           m_link[GetNode(i-1,j,k)->GetId()].AddChild(nodes.Get(l)->GetId());
         }
         layer.push_back(nodes);
@@ -159,7 +160,7 @@ PointToPointTreeHelper::InstallStack (InternetStackHelper stack)
 void 
 PointToPointTreeHelper::AssignIpv4Addresses (Ipv4AddressHelper address)
 {
-  std::ofstream ifs("myExampleNodeList.csv");
+  std::ofstream ifs("myNodeList.csv");
   ifs<<"fromN fromA toN toA"<<std::endl;
 
   for(size_t nLayer=0; nLayer<(GetNLayers()-1); nLayer++){

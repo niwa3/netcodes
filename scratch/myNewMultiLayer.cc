@@ -85,7 +85,7 @@ main(int argc, char *argv[])
   cmd.AddValue ("top", "top server place (ex. 0)", top);
   cmd.AddValue ("mid", "mid server place (ex. 1)", mid);
   cmd.AddValue ("end", "end server place (ex. 1)", end);
-  cmd.AddValue ("path", "path of trace file (ex. /root/result)", mid);
+  cmd.AddValue ("path", "path of trace file (ex. /root/result)", path);
   cmd.Parse(argc, argv);
 
   const std::vector<int> NODE_NUM = stringSplitToInt(nodeNum, '-');

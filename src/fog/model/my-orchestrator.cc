@@ -125,7 +125,7 @@ void MyOrchestrator::AssignClient(){
       serverApp.Add(serverHelper.Install(m_p2pHelper.GetNode(m_p2pHelper.GetNLayers()-1,i,j)));
       clientApp.Start(Seconds(1.0));
       clientApp.Stop(Seconds(m_simTime));
-      serverApp.Start(Seconds(1.0));
+      serverApp.Start(Seconds(0.1));
       serverApp.Stop(Seconds(m_simTime+10));
     }
   }
