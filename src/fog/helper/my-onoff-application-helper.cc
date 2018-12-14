@@ -84,7 +84,7 @@ MyOnOffHelper::AssignStreams (NodeContainer c, int64_t stream)
 void 
 MyOnOffHelper::SetConstantRate (DataRate dataRate, uint32_t packetSize)
 {
-  m_factory.Set ("OnTime", StringValue ("ns3::ConstantRandomVariable[Constant=1000]"));
+  //m_factory.Set ("OnTime", StringValue ("ns3::ConstantRandomVariable[Constant=1000]"));
   m_factory.Set ("OffTime", StringValue ("ns3::ConstantRandomVariable[Constant=0]"));
   m_factory.Set ("IsBulkSend", BooleanValue(true));
   m_factory.Set ("DataRate", DataRateValue (dataRate));

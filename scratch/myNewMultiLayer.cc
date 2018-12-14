@@ -29,7 +29,6 @@
 #include "ns3/my-tcp-server-helper.h"
 #include "ns3/my-receive-server-helper.h"
 #include "ns3/flow-monitor-helper.h"
-#include "ns3/gtk-config-store.h"
 
 #include "ns3/my-tree.h"
 #include "ns3/my-orchestrator.h"
@@ -39,7 +38,7 @@ using namespace ns3;
 NS_LOG_COMPONENT_DEFINE("ScriptExample");
 
 //Grobal
-static const double SIM_TIME = 180.0;
+static const double SIM_TIME = 21.0;
 static const int MTU = 1500;
 
 //My functions start
@@ -68,8 +67,6 @@ std::vector<std::string> stringSplit(const std::string &str, char sep)
 int
 main(int argc, char *argv[])
 {
-  GtkConfigStore config;
-
   std::string nodeNum = "1-1-5-20";
   std::string bands = "40Gbps-10Gbps-1Gbps";
   std::string delays = "10ms-5ms-2ms";
@@ -77,6 +74,7 @@ main(int argc, char *argv[])
   uint32_t mid = 0;
   uint32_t end = 0;
   std::string path="/root/result";
+  uint32_t makespan = 200000;
 
   CommandLine cmd;
   cmd.AddValue ("node", "the number of nodes of each layer (\"Cloud Server ... Router ... GW\") (ex. \"1-2-10\")", nodeNum);
@@ -85,7 +83,8 @@ main(int argc, char *argv[])
   cmd.AddValue ("top", "top server place (ex. 0)", top);
   cmd.AddValue ("mid", "mid server place (ex. 1)", mid);
   cmd.AddValue ("end", "end server place (ex. 1)", end);
-  cmd.AddValue ("path", "path of trace file (ex. /root/result)", mid);
+  cmd.AddValue ("path", "path of trace file (ex. /root/result)", path);
+  cmd.AddValue ("makespan", "interval of paket send(ex. 200000)", makespan);
   cmd.Parse(argc, argv);
 
   const std::vector<int> NODE_NUM = stringSplitToInt(nodeNum, '-');
@@ -120,18 +119,21 @@ main(int argc, char *argv[])
   Ipv4GlobalRoutingHelper::PopulateRoutingTables();
 
   MyOrchestrator orch(p2ptree);
-  orch.SetClientOffTime("ns3::ExponentialRandomVariable[Mean=200000]");
-  uint8_t first = orch.AddServerHelper(100.0,Ipv4Address::GetAny());
-  uint8_t second = orch.AddServerHelper(100.0,Ipv4Address::GetAny());
-  uint8_t third = orch.AddServerHelper(100.0,Ipv4Address::GetAny());
-  orch.CreateChaine(second, first);
-  orch.CreateChaine(third, second);
+  orch.SetSimulationTime(SIM_TIME);
+  std::stringstream off;
+  off<<"ns3::ExponentialRandomVariable[Mean="<<makespan<<"]";
+  orch.SetClientOffTime(off.str());
+  //uint8_t first = orch.AddServerHelper(20.0,Ipv4Address::GetAny());
+  orch.AddServerHelper(20.0,Ipv4Address::GetAny());
+  //uint8_t second = orch.AddServerHelper(20.0,Ipv4Address::GetAny());
+  //uint8_t third = orch.AddServerHelper(20.0,Ipv4Address::GetAny());
+  //orch.CreateChaine(second, first);
+  //orch.CreateChaine(third, second);
   orch.SetPlace(top,mid,end);
   orch.SetPath(path);
   orch.Assign();
 
   Simulator::Stop(Seconds(SIM_TIME+10));
-  config.ConfigureAttributes();
   Simulator::Run();
   Simulator::Destroy();
 
