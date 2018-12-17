@@ -59,11 +59,13 @@ private:
   uint32_t m_mid;
   uint32_t m_end;
 
+  std::vector<std::vector<double>> m_process;
+
   std::string m_path;
 
 public:
   void Assign();
-  uint32_t AddServerHelper(double meanCalctime, Ipv4Address allowAddress);
+  uint32_t AddServerHelper(std::vector<double> meanCalctime, Ipv4Address allowAddress);
   uint32_t GetCurrentNServer();
   void CreateChaine(uint32_t fromServerIndex, uint32_t toServerIndex);
   void SetSimulationTime(int time);

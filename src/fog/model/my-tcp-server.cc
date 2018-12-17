@@ -90,7 +90,7 @@ MyTcpServer::MyTcpServer ()
   NS_LOG_FUNCTION (this);
   m_socket = 0;
   m_totalRx = 0;
-  m_jobQueue.SetMaxPackets(1000);
+  m_jobQueue.SetMaxPackets(10000000);
 }
 
 MyTcpServer::~MyTcpServer()
