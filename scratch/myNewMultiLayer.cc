@@ -125,18 +125,23 @@ main(int argc, char *argv[])
   std::stringstream off;
   off<<"ns3::ExponentialRandomVariable[Mean="<<makespan<<"]";
   orch.SetClientOffTime(off.str());
-  //uint8_t first = orch.AddServerHelper(20.0,Ipv4Address::GetAny());
-  orch.AddServerHelper(20.0,Ipv4Address::GetAny());
-  //uint8_t second = orch.AddServerHelper(20.0,Ipv4Address::GetAny());
-  //uint8_t third = orch.AddServerHelper(20.0,Ipv4Address::GetAny());
-  //orch.CreateChaine(second, first);
-  //orch.CreateChaine(third, second);
+  //orch.AddServerHelper(20.0,Ipv4Address::GetAny());
+  //std::vector<double> stMu{1,10,100,1000};
+  //std::vector<double> ndMu{15,60,250,2000};
+  std::vector<double> stMu{20,40,60,80};
+  std::vector<double> ndMu{20,40,60,80};
+  std::vector<double> thMu{20,40,60,80};
+  //std::vector<double> thMu{1,10,100,1000};
+  uint8_t first = orch.AddServerHelper(stMu,Ipv4Address::GetAny());
+  uint8_t second = orch.AddServerHelper(ndMu,Ipv4Address::GetAny());
+  uint8_t third = orch.AddServerHelper(thMu,Ipv4Address::GetAny());
+  orch.CreateChaine(second, first);
+  orch.CreateChaine(third, second);
   orch.SetPlace(top,mid,end);
   orch.SetPath(path);
   orch.Assign();
 
   Simulator::Stop(Seconds(SIM_TIME+10));
-  config.ConfigureAttributes();
   Simulator::Run();
   Simulator::Destroy();
 

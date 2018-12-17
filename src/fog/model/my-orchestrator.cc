@@ -67,8 +67,29 @@ TxTracer(Ptr<OutputStreamWrapper> stream, Ptr<const Packet> packet)
   NS_LOG_DEBUG(text.str());
   auto json = json11::Json::parse(text.str(), err);
   int total = json["Total"].int_value();
- 
   *stream->GetStream() << Simulator::Now().GetNanoSeconds() << " " << packet->GetSize() << " " << total << std::endl;
+}
+
+static void
+DropTracer(Ptr<OutputStreamWrapper> stream, Ptr<const Packet> packet)
+{
+  std::string err;
+  uint8_t buf[5096];
+  packet->CopyData(buf, 5096);
+  std::stringstream text;
+  text << buf;
+  NS_LOG_DEBUG(text.str());
+  auto json = json11::Json::parse(text.str(), err);
+  int total = json["Total"].int_value();
+  *stream->GetStream() << Simulator::Now().GetNanoSeconds() << " " << packet->GetSize() << " " << total << std::endl;
+}
+
+static void
+QueueTracer(Ptr<OutputStreamWrapper> stream, uint32_t packetsInQueueOld, uint32_t packetsInQueueNew)
+{
+  if(packetsInQueueOld<packetsInQueueNew){
+    *stream->GetStream() << Simulator::Now().GetNanoSeconds() << " " << packetsInQueueOld << " " << packetsInQueueNew << std::endl;
+  }
 }
 
 
@@ -94,9 +115,10 @@ void MyOrchestrator::Assign(){
   SetTracer();
 }
 
-uint32_t MyOrchestrator::AddServerHelper(double meanCalctime, Ipv4Address allowAddress){
-  MyTcpServerHelper myTcpServerHelper(m_protocol, m_clientPktSize, meanCalctime, InetSocketAddress(allowAddress,m_sinkPort+m_currentServerNum));
+uint32_t MyOrchestrator::AddServerHelper(std::vector<double> meanCalctime, Ipv4Address allowAddress){
+  MyTcpServerHelper myTcpServerHelper(m_protocol, m_clientPktSize, meanCalctime[0], InetSocketAddress(allowAddress,m_sinkPort+m_currentServerNum));
   m_serverHelper[m_currentServerNum] = myTcpServerHelper;
+  m_process.push_back(meanCalctime);
   m_currentServerNum++;
   return m_currentServerNum-1;
 }
@@ -182,7 +204,7 @@ void MyOrchestrator::AssignServer(uint32_t serverIndex, uint32_t nLayer){
           }
         }
         std::stringstream meanTime;
-        meanTime << "ns3::ExponentialRandomVariable[Mean=" << 20.0*(nLayer+1) << "]";
+        meanTime << "ns3::ExponentialRandomVariable[Mean=" << m_process[serverIndex][nLayer] << "]";
         m_serverHelper[serverIndex].SetAttribute("CalcTime", StringValue(meanTime.str()));
         ApplicationContainer servers = m_p2pHelper.InstallApp(m_serverHelper[serverIndex], nLayer, i, j);
         NS_LOG_DEBUG("address: "<<m_p2pHelper.GetIpv4Address(nLayer,i,j,1)<<" size: "<<addrTable.size());
@@ -192,7 +214,7 @@ void MyOrchestrator::AssignServer(uint32_t serverIndex, uint32_t nLayer){
       }
       else{
         std::stringstream meanTime;
-        meanTime << "ns3::ExponentialRandomVariable[Mean=" << 20.0*(nLayer+1) << "]";
+        meanTime << "ns3::ExponentialRandomVariable[Mean=" << m_process[serverIndex][nLayer] << "]";
         m_serverHelper[serverIndex].SetAttribute("CalcTime", StringValue(meanTime.str()));
         ApplicationContainer servers = m_p2pHelper.InstallApp(m_serverHelper[serverIndex], nLayer, i, j);
         servers.Start(Seconds(0.1));
@@ -243,12 +265,11 @@ uint32_t MyOrchestrator::Factorial(uint32_t m){
 }
 
 void MyOrchestrator::Algorithm(){
-  AssignServer(0,0);
-  //AssignServer(0,m_top);
-  //AssignServer(1,m_mid);
-  //AssignServer(2,m_end);
-  //m_firstServer = m_end;
-  m_firstServer = 0;
+  //AssignServer(0,3);
+  AssignServer(0,m_top);
+  AssignServer(1,m_mid);
+  AssignServer(2,m_end);
+  m_firstServer = m_end;
   AssignClient();
 }
 
@@ -270,30 +291,63 @@ void MyOrchestrator::SetTracer(){
       rxPath << "/NodeList/" << id << "/ApplicationList/*/$ns3::MyReceiveServer/Rx";
       Ptr<OutputStreamWrapper> rxStream = asciiTraceHelper.CreateFileStream(rxFile.str().c_str());
       Config::ConnectWithoutContext(rxPath.str().c_str(),MakeBoundCallback(&RxTracer, rxStream));
+      std::stringstream qFile;
+      qFile << m_path << "/myQueueLen-" << id << ".csv";
+      std::stringstream qPath;
+      qPath << "/NodeList/" << id << "/DeviceList/*/$ns3::PointToPointNetDevice/TxQueue/PacketsInQueue";
+      Ptr<OutputStreamWrapper> qStream = asciiTraceHelper.CreateFileStream(qFile.str().c_str());
+      Config::ConnectWithoutContext(qPath.str().c_str(),MakeBoundCallback(&QueueTracer, qStream));
+      std::stringstream dtFile;
+      dtFile << m_path << "/myTxDrop-" << id << ".csv";
+      std::stringstream dtPath;
+      dtPath << "/NodeList/" << id << "/DeviceList/*/$ns3::PointToPointNetDevice/PhyTxDrop";
+      Ptr<OutputStreamWrapper> dtStream = asciiTraceHelper.CreateFileStream(dtFile.str().c_str());
+      Config::ConnectWithoutContext(dtPath.str().c_str(),MakeBoundCallback(&DropTracer, dtStream));
     }
   }
 
-  //{
-  //  int i = 0;
-  //  int j = 0;
-  //  std::vector<uint32_t> counter(m_p2pHelper.GetNLayers(),0);
-  //  for(auto k: m_serverPlace){
-  //    uint32_t id = m_p2pHelper.GetNode(k.second,i,j)->GetId();
-  //    std::stringstream txFile;
-  //    txFile << path << "/myServer"<<k.first<<"Tx-" << id << ".csv";
-  //    std::stringstream txPath;
-  //    txPath << "/NodeList/" << id << "/ApplicationList/"<<counter[k.second]<<"/$ns3::MyTcpServer/Tx";
-  //    Ptr<OutputStreamWrapper> txStream = asciiTraceHelper.CreateFileStream(txFile.str().c_str());
-  //    Config::ConnectWithoutContext (txPath.str().c_str(), MakeBoundCallback(&TxTracer, txStream));
-  //    std::stringstream rxFile;
-  //    rxFile << path << "/myServer"<<k.first<<"Rx-" << id << ".csv";
-  //    std::stringstream rxPath;
-  //    rxPath << "/NodeList/" << id << "/ApplicationList/"<<counter[k.second]<<"/$ns3::MyTcpServer/Rx";
-  //    Ptr<OutputStreamWrapper> rxStream = asciiTraceHelper.CreateFileStream(rxFile.str().c_str());
-  //    Config::ConnectWithoutContext (rxPath.str().c_str(), MakeBoundCallback(&RxTracer, rxStream));
-  //    counter[k.second] += 1;
-  //  }
-  //}
+  {
+    int i = 0;
+    int j = 0;
+    std::vector<uint32_t> counter(m_p2pHelper.GetNLayers(),0);
+    for(auto k: m_serverPlace){
+      uint32_t id = m_p2pHelper.GetNode(k.second,i,j)->GetId();
+      std::stringstream txFile;
+      txFile << m_path << "/myServer"<<k.first<<"Tx-" << id << ".csv";
+      std::stringstream txPath;
+      txPath << "/NodeList/" << id << "/ApplicationList/"<<counter[k.second]<<"/$ns3::MyTcpServer/Tx";
+      Ptr<OutputStreamWrapper> txStream = asciiTraceHelper.CreateFileStream(txFile.str().c_str());
+      Config::ConnectWithoutContext (txPath.str().c_str(), MakeBoundCallback(&TxTracer, txStream));
+      std::stringstream rxFile;
+      rxFile << m_path << "/myServer"<<k.first<<"Rx-" << id << ".csv";
+      std::stringstream rxPath;
+      rxPath << "/NodeList/" << id << "/ApplicationList/"<<counter[k.second]<<"/$ns3::MyTcpServer/Rx";
+      Ptr<OutputStreamWrapper> rxStream = asciiTraceHelper.CreateFileStream(rxFile.str().c_str());
+      Config::ConnectWithoutContext (rxPath.str().c_str(), MakeBoundCallback(&RxTracer, rxStream));
+      counter[k.second] += 1;
+      std::stringstream qFile;
+      qFile << m_path << "/myQueueLen-" << id << ".csv";
+      std::stringstream qPath;
+      qPath << "/NodeList/" << id << "/DeviceList/*/$ns3::PointToPointNetDevice/TxQueue/PacketsInQueue";
+      Ptr<OutputStreamWrapper> qStream = asciiTraceHelper.CreateFileStream(qFile.str().c_str());
+      Config::ConnectWithoutContext(qPath.str().c_str(),MakeBoundCallback(&QueueTracer, qStream));
+      std::stringstream dtFile;
+      dtFile << m_path << "/myTxDrop-" << id << ".csv";
+      std::stringstream dtPath;
+      dtPath << "/NodeList/" << id << "/DeviceList/*/$ns3::PointToPointNetDevice/PhyRxDrop";
+      Ptr<OutputStreamWrapper> dtStream = asciiTraceHelper.CreateFileStream(dtFile.str().c_str());
+      Config::ConnectWithoutContext(dtPath.str().c_str(),MakeBoundCallback(&DropTracer, dtStream));
+    }
+  }
+  {
+    std::stringstream qFile;
+    qFile << m_path << "/myQueueLen-" << 1 << ".csv";
+    std::stringstream qPath;
+    qPath << "/NodeList/" << 1 << "/DeviceList/1/$ns3::PointToPointNetDevice/TxQueue/PacketsInQueue";
+    Ptr<OutputStreamWrapper> qStream = asciiTraceHelper.CreateFileStream(qFile.str().c_str());
+    Config::ConnectWithoutContext(qPath.str().c_str(),MakeBoundCallback(&QueueTracer, qStream));
+  }
+ 
 }
 
 void MyOrchestrator::SetPlace(uint32_t top, uint32_t mid, uint32_t end){
