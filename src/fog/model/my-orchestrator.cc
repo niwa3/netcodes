@@ -182,7 +182,7 @@ void MyOrchestrator::AssignServer(uint32_t serverIndex, uint32_t nLayer){
           }
         }
         std::stringstream meanTime;
-        meanTime << "ns3::ExponentialRandomVariable[Mean=" << 100.0*(nLayer+1) << "]";
+        meanTime << "ns3::ExponentialRandomVariable[Mean=" << 20.0*(nLayer+1) << "]";
         m_serverHelper[serverIndex].SetAttribute("CalcTime", StringValue(meanTime.str()));
         ApplicationContainer servers = m_p2pHelper.InstallApp(m_serverHelper[serverIndex], nLayer, i, j);
         NS_LOG_DEBUG("address: "<<m_p2pHelper.GetIpv4Address(nLayer,i,j,1)<<" size: "<<addrTable.size());
@@ -192,7 +192,7 @@ void MyOrchestrator::AssignServer(uint32_t serverIndex, uint32_t nLayer){
       }
       else{
         std::stringstream meanTime;
-        meanTime << "ns3::ExponentialRandomVariable[Mean=" << 100.0*(nLayer+1) << "]";
+        meanTime << "ns3::ExponentialRandomVariable[Mean=" << 20.0*(nLayer+1) << "]";
         m_serverHelper[serverIndex].SetAttribute("CalcTime", StringValue(meanTime.str()));
         ApplicationContainer servers = m_p2pHelper.InstallApp(m_serverHelper[serverIndex], nLayer, i, j);
         servers.Start(Seconds(0.1));
