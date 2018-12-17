@@ -31,6 +31,8 @@
 #include "ns3/ipv6-address-generator.h"
 #include "ns3/core-module.h"
 
+#include "ns3/traffic-control-module.h"
+
 #include "my-tree.h"
 
 namespace ns3 {
@@ -168,12 +170,15 @@ PointToPointTreeHelper::AssignIpv4Addresses (Ipv4AddressHelper address)
     p2p.SetQueue("ns3::DropTailQueue", "MaxSize", StringValue ("10000000p"));
     p2p.SetDeviceAttribute("DataRate", StringValue(m_bandwidths[nLayer]));
     p2p.SetChannelAttribute("Delay", StringValue(m_delays[nLayer]));
+    TrafficControlHelper tch;
+    tch.SetRootQueueDisc ("ns3::PfifoFastQueueDisc", "MaxSize", StringValue ("10000000p"));
     for(size_t nGroup=0; nGroup<GetNGroups(nLayer); nGroup++){
       for(size_t nNode=0; nNode<GetNNodes(nLayer,nGroup); nNode++){
         for(int i=0; i<m_nodeNums[nLayer+1]; i++){
           Ptr<Node> fromNode = GetNode(nLayer, nGroup, nNode);
           Ptr<Node> toNode = GetNode(nLayer+1, nGroup*GetNNodes(nLayer,nGroup)+nNode, i);
           NetDeviceContainer device = p2p.Install(fromNode,toNode);
+          tch.Install (device);
           Ipv4InterfaceContainer interface = address.Assign(device);
           ifs <<fromNode->GetId()<<" "<<InetSocketAddress(interface.GetAddress(0)).GetIpv4()<<" "
               <<toNode->GetId()<<" "<<InetSocketAddress(interface.GetAddress(1)).GetIpv4()<<std::endl;

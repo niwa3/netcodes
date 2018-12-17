@@ -46,8 +46,8 @@ static void
 RxTracer(Ptr<OutputStreamWrapper> stream, Ptr<const Packet> packet, const Address& address)
 {
   std::string err;
-  uint8_t buf[5096];
-  packet->CopyData(buf, 5096);
+  uint8_t buf[5120];
+  packet->CopyData(buf, 5120);
   std::stringstream text;
   text << buf;
   NS_LOG_DEBUG(text.str());
@@ -60,8 +60,8 @@ static void
 TxTracer(Ptr<OutputStreamWrapper> stream, Ptr<const Packet> packet)
 {
   std::string err;
-  uint8_t buf[5096];
-  packet->CopyData(buf, 5096);
+  uint8_t buf[5120];
+  packet->CopyData(buf, 5120);
   std::stringstream text;
   text << buf;
   NS_LOG_DEBUG(text.str());
@@ -71,11 +71,11 @@ TxTracer(Ptr<OutputStreamWrapper> stream, Ptr<const Packet> packet)
 }
 
 static void
-DropTracer(Ptr<OutputStreamWrapper> stream, Ptr<const Packet> packet)
+PacketTracer(Ptr<OutputStreamWrapper> stream, Ptr<const Packet> packet)
 {
   std::string err;
-  uint8_t buf[5096];
-  packet->CopyData(buf, 5096);
+  uint8_t buf[5120];
+  packet->CopyData(buf, 5120);
   std::stringstream text;
   text << buf;
   NS_LOG_DEBUG(text.str());
@@ -99,7 +99,7 @@ MyOrchestrator::MyOrchestrator(PointToPointTreeHelper p2pHelper)
     m_protocol("ns3::TcpSocketFactory"),
     m_currentServerNum(0),
     m_clientOffTime("ns3::ExponentialRandomVariable[Mean=1]"),
-    m_clientPktSize(5096),
+    m_clientPktSize(5120),
     m_clientDataRate("1Mb/s"),
     m_firstServer(0)
 {
@@ -298,11 +298,11 @@ void MyOrchestrator::SetTracer(){
       Ptr<OutputStreamWrapper> qStream = asciiTraceHelper.CreateFileStream(qFile.str().c_str());
       Config::ConnectWithoutContext(qPath.str().c_str(),MakeBoundCallback(&QueueTracer, qStream));
       std::stringstream dtFile;
-      dtFile << m_path << "/myTxDrop-" << id << ".csv";
+      dtFile << m_path << "/myDrop-" << id << ".csv";
       std::stringstream dtPath;
-      dtPath << "/NodeList/" << id << "/DeviceList/*/$ns3::PointToPointNetDevice/PhyTxDrop";
+      dtPath << "/NodeList/" << id << "/DeviceList/*/$ns3::PointToPointNetDevice/MacTx";
       Ptr<OutputStreamWrapper> dtStream = asciiTraceHelper.CreateFileStream(dtFile.str().c_str());
-      Config::ConnectWithoutContext(dtPath.str().c_str(),MakeBoundCallback(&DropTracer, dtStream));
+      Config::ConnectWithoutContext(dtPath.str().c_str(),MakeBoundCallback(&PacketTracer, dtStream));
     }
   }
 
@@ -332,11 +332,11 @@ void MyOrchestrator::SetTracer(){
       Ptr<OutputStreamWrapper> qStream = asciiTraceHelper.CreateFileStream(qFile.str().c_str());
       Config::ConnectWithoutContext(qPath.str().c_str(),MakeBoundCallback(&QueueTracer, qStream));
       std::stringstream dtFile;
-      dtFile << m_path << "/myTxDrop-" << id << ".csv";
+      dtFile << m_path << "/myDrop-" << id << ".csv";
       std::stringstream dtPath;
-      dtPath << "/NodeList/" << id << "/DeviceList/*/$ns3::PointToPointNetDevice/PhyRxDrop";
+      dtPath << "/NodeList/" << id << "/DeviceList/*/$ns3::PointToPointNetDevice/MacRx";
       Ptr<OutputStreamWrapper> dtStream = asciiTraceHelper.CreateFileStream(dtFile.str().c_str());
-      Config::ConnectWithoutContext(dtPath.str().c_str(),MakeBoundCallback(&DropTracer, dtStream));
+      Config::ConnectWithoutContext(dtPath.str().c_str(),MakeBoundCallback(&PacketTracer, dtStream));
     }
   }
   {
