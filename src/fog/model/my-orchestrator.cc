@@ -71,20 +71,6 @@ TxTracer(Ptr<OutputStreamWrapper> stream, Ptr<const Packet> packet)
 }
 
 static void
-PacketTracer(Ptr<OutputStreamWrapper> stream, Ptr<const Packet> packet)
-{
-  std::string err;
-  uint8_t buf[5120];
-  packet->CopyData(buf, 5120);
-  std::stringstream text;
-  text << buf;
-  NS_LOG_DEBUG(text.str());
-  auto json = json11::Json::parse(text.str(), err);
-  int total = json["Total"].int_value();
-  *stream->GetStream() << Simulator::Now().GetNanoSeconds() << " " << packet->GetSize() << " " << total << std::endl;
-}
-
-static void
 QueueTracer(Ptr<OutputStreamWrapper> stream, uint32_t packetsInQueueOld, uint32_t packetsInQueueNew)
 {
   if(packetsInQueueOld<packetsInQueueNew){
@@ -103,7 +89,10 @@ MyOrchestrator::MyOrchestrator(PointToPointTreeHelper p2pHelper)
     m_clientDataRate("1Mb/s"),
     m_firstServer(0)
 {
-    m_p2pHelper = p2pHelper;
+  m_p2pHelper = p2pHelper;
+  for(size_t i=0;i<p2pHelper.GetNLayers();i++){
+    m_processCount.push_back(0);
+  }
 }
 
 MyOrchestrator::~MyOrchestrator ()
@@ -203,8 +192,9 @@ void MyOrchestrator::AssignServer(uint32_t serverIndex, uint32_t nLayer){
             }
           }
         }
+        uint32_t nProcess = m_processCount[nLayer];
         std::stringstream meanTime;
-        meanTime << "ns3::ExponentialRandomVariable[Mean=" << m_process[serverIndex][nLayer] << "]";
+        meanTime << "ns3::ExponentialRandomVariable[Mean=" << m_process[serverIndex][nLayer]/nProcess << "]";
         m_serverHelper[serverIndex].SetAttribute("CalcTime", StringValue(meanTime.str()));
         ApplicationContainer servers = m_p2pHelper.InstallApp(m_serverHelper[serverIndex], nLayer, i, j);
         NS_LOG_DEBUG("address: "<<m_p2pHelper.GetIpv4Address(nLayer,i,j,1)<<" size: "<<addrTable.size());
@@ -213,8 +203,9 @@ void MyOrchestrator::AssignServer(uint32_t serverIndex, uint32_t nLayer){
         servers.Stop(Seconds(m_simTime+5));
       }
       else{
+        uint32_t nProcess = m_processCount[nLayer];
         std::stringstream meanTime;
-        meanTime << "ns3::ExponentialRandomVariable[Mean=" << m_process[serverIndex][nLayer] << "]";
+        meanTime << "ns3::ExponentialRandomVariable[Mean=" << m_process[serverIndex][nLayer]/nProcess << "]";
         m_serverHelper[serverIndex].SetAttribute("CalcTime", StringValue(meanTime.str()));
         ApplicationContainer servers = m_p2pHelper.InstallApp(m_serverHelper[serverIndex], nLayer, i, j);
         servers.Start(Seconds(0.1));
@@ -266,6 +257,9 @@ uint32_t MyOrchestrator::Factorial(uint32_t m){
 
 void MyOrchestrator::Algorithm(){
   //AssignServer(0,3);
+  AddProcessCount(m_top);
+  AddProcessCount(m_mid);
+  AddProcessCount(m_end);
   AssignServer(0,m_top);
   AssignServer(1,m_mid);
   AssignServer(2,m_end);
@@ -297,12 +291,6 @@ void MyOrchestrator::SetTracer(){
       qPath << "/NodeList/" << id << "/DeviceList/*/$ns3::PointToPointNetDevice/TxQueue/PacketsInQueue";
       Ptr<OutputStreamWrapper> qStream = asciiTraceHelper.CreateFileStream(qFile.str().c_str());
       Config::ConnectWithoutContext(qPath.str().c_str(),MakeBoundCallback(&QueueTracer, qStream));
-      std::stringstream dtFile;
-      dtFile << m_path << "/myDrop-" << id << ".csv";
-      std::stringstream dtPath;
-      dtPath << "/NodeList/" << id << "/DeviceList/*/$ns3::PointToPointNetDevice/MacTx";
-      Ptr<OutputStreamWrapper> dtStream = asciiTraceHelper.CreateFileStream(dtFile.str().c_str());
-      Config::ConnectWithoutContext(dtPath.str().c_str(),MakeBoundCallback(&PacketTracer, dtStream));
     }
   }
 
@@ -331,23 +319,8 @@ void MyOrchestrator::SetTracer(){
       qPath << "/NodeList/" << id << "/DeviceList/*/$ns3::PointToPointNetDevice/TxQueue/PacketsInQueue";
       Ptr<OutputStreamWrapper> qStream = asciiTraceHelper.CreateFileStream(qFile.str().c_str());
       Config::ConnectWithoutContext(qPath.str().c_str(),MakeBoundCallback(&QueueTracer, qStream));
-      std::stringstream dtFile;
-      dtFile << m_path << "/myDrop-" << id << ".csv";
-      std::stringstream dtPath;
-      dtPath << "/NodeList/" << id << "/DeviceList/*/$ns3::PointToPointNetDevice/MacRx";
-      Ptr<OutputStreamWrapper> dtStream = asciiTraceHelper.CreateFileStream(dtFile.str().c_str());
-      Config::ConnectWithoutContext(dtPath.str().c_str(),MakeBoundCallback(&PacketTracer, dtStream));
     }
   }
-  {
-    std::stringstream qFile;
-    qFile << m_path << "/myQueueLen-" << 1 << ".csv";
-    std::stringstream qPath;
-    qPath << "/NodeList/" << 1 << "/DeviceList/1/$ns3::PointToPointNetDevice/TxQueue/PacketsInQueue";
-    Ptr<OutputStreamWrapper> qStream = asciiTraceHelper.CreateFileStream(qFile.str().c_str());
-    Config::ConnectWithoutContext(qPath.str().c_str(),MakeBoundCallback(&QueueTracer, qStream));
-  }
- 
 }
 
 void MyOrchestrator::SetPlace(uint32_t top, uint32_t mid, uint32_t end){
@@ -358,6 +331,11 @@ void MyOrchestrator::SetPlace(uint32_t top, uint32_t mid, uint32_t end){
 
 void MyOrchestrator::SetPath(std::string path){
   m_path = path;
+}
+
+void MyOrchestrator::AddProcessCount(uint32_t place){
+  uint32_t tmp = m_processCount[place];
+  m_processCount[place] = tmp+1;
 }
 
 } // namespace ns3
