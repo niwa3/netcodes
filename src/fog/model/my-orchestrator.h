@@ -44,6 +44,7 @@ private:
   std::map<uint32_t, MyTcpServerHelper> m_serverHelper;
   std::map<uint32_t, uint32_t> m_serverPlace;
   std::map<uint32_t, uint32_t> m_chaine;
+  std::vector<uint32_t> m_processCount;
 
   int m_simTime;
   int m_sinkPort;
@@ -85,6 +86,7 @@ private:
   uint32_t Factorial(uint32_t m);
   void Algorithm();
   void SetTracer();
+  void AddProcessCount(uint32_t place);
 
 };
 
