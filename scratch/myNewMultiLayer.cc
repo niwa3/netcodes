@@ -54,6 +54,17 @@ std::vector<int> stringSplitToInt(const std::string &str, char sep)
   return v;
 }
 
+std::vector<uint32_t> stringSplitToUint(const std::string &str, char sep)
+{
+  std::vector<uint32_t> v;
+  std::stringstream ss(str);
+  std::string buffer;
+  while( getline(ss, buffer, sep) ) {
+    v.push_back(std::atoi(buffer.c_str()));
+  }
+  return v;
+}
+
 std::vector<std::string> stringSplit(const std::string &str, char sep)
 {
   std::vector<std::string> v;
@@ -68,13 +79,10 @@ std::vector<std::string> stringSplit(const std::string &str, char sep)
 int
 main(int argc, char *argv[])
 {
-  GtkConfigStore config;
   std::string nodeNum = "1-1-5-20";
   std::string bands = "40Gbps-10Gbps-1Gbps";
   std::string delays = "10ms-5ms-2ms";
-  uint32_t top = 0;
-  uint32_t mid = 0;
-  uint32_t end = 0;
+  std::string place = "0-0-0-0";
   std::string path="/root/result";
   uint32_t makespan = 200000;
 
@@ -82,9 +90,7 @@ main(int argc, char *argv[])
   cmd.AddValue ("node", "the number of nodes of each layer (\"Cloud Server ... Router ... GW\") (ex. \"1-2-10\")", nodeNum);
   cmd.AddValue ("net", "the bandwidth of net of each layer (\"Cloud-Server Server-Router ... Router-GW\") (ex. \"40Gbps-10Gbps-1Gbps\")", bands);
   cmd.AddValue ("delay", "the delay of net of each layer (\"Cloud-Server Server-Router ... Router-GW\") (ex. \"10ms-5ms-1ms\")", delays);
-  cmd.AddValue ("top", "top server place (ex. 0)", top);
-  cmd.AddValue ("mid", "mid server place (ex. 1)", mid);
-  cmd.AddValue ("end", "end server place (ex. 1)", end);
+  cmd.AddValue ("place", "server place (ex. 0-0-0-0)", place);
   cmd.AddValue ("path", "path of trace file (ex. /root/result)", path);
   cmd.AddValue ("makespan", "interval of paket send(ex. 200000)", makespan);
   cmd.Parse(argc, argv);
@@ -92,6 +98,7 @@ main(int argc, char *argv[])
   const std::vector<int> NODE_NUM = stringSplitToInt(nodeNum, '-');
   const std::vector<std::string> BANDS = stringSplit(bands, '-');
   const std::vector<std::string> DELAYS = stringSplit(delays, '-');
+  std::vector<uint32_t> PLACE = stringSplitToUint(place,'-');
 
   NS_LOG_INFO("Creating Topology");
 
@@ -128,22 +135,27 @@ main(int argc, char *argv[])
   std::stringstream off;
   off<<"ns3::ExponentialRandomVariable[Mean="<<makespan<<"]";
   orch.SetClientOffTime(off.str());
-  std::vector<double> stMu{20,40,60,80};
-  std::vector<double> ndMu{20,40,60,80};
-  std::vector<double> thMu{20,40,60,80};
+  //std::vector<double> stMu{1,10,100,1000};
+  //std::vector<double> ndMu{15,60,250,2000};
+  //std::vector<double> thMu{1,10,100,1000};
+  std::vector<double> stMu{1,1,1,1};
+  std::vector<double> ndMu{1,1,1,1};
+  std::vector<double> rdMu{1,1,1,1};
+  std::vector<double> thMu{1,1,1,1};
 
   uint8_t first = orch.AddServerHelper(stMu,Ipv4Address::GetAny());
   //orch.AddServerHelper(20.0,Ipv4Address::GetAny());
   uint8_t second = orch.AddServerHelper(ndMu,Ipv4Address::GetAny());
-  uint8_t third = orch.AddServerHelper(thMu,Ipv4Address::GetAny());
-  orch.CreateChaine(second, first);
-  orch.CreateChaine(third, second);
-  orch.SetPlace(top,mid,end);
+  uint8_t third = orch.AddServerHelper(rdMu,Ipv4Address::GetAny());
+  uint8_t fourth = orch.AddServerHelper(thMu,Ipv4Address::GetAny());
+  orch.CreateChaine(first, second);
+  orch.CreateChaine(second, third);
+  orch.CreateChaine(third, fourth);
+  orch.SetPlace(PLACE);
   orch.SetPath(path);
   orch.Assign();
 
   Simulator::Stop(Seconds(SIM_TIME+10));
-  config.ConfigureAttributes();
   Simulator::Run();
   Simulator::Destroy();
 

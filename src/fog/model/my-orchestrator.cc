@@ -50,7 +50,7 @@ RxTracer(Ptr<OutputStreamWrapper> stream, Ptr<const Packet> packet, const Addres
   packet->CopyData(buf, 5120);
   std::stringstream text;
   text << buf;
-  NS_LOG_DEBUG(text.str());
+  //NS_LOG_DEBUG(text.str());
   auto json = json11::Json::parse(text.str(), err);
   int total = json["Total"].int_value();
   *stream->GetStream() << InetSocketAddress::ConvertFrom(address).GetIpv4() << " " << Simulator::Now().GetNanoSeconds() << " " << packet->GetSize() << " " << total << std::endl;
@@ -64,7 +64,7 @@ TxTracer(Ptr<OutputStreamWrapper> stream, Ptr<const Packet> packet)
   packet->CopyData(buf, 5120);
   std::stringstream text;
   text << buf;
-  NS_LOG_DEBUG(text.str());
+  //NS_LOG_DEBUG(text.str());
   auto json = json11::Json::parse(text.str(), err);
   int total = json["Total"].int_value();
   *stream->GetStream() << Simulator::Now().GetNanoSeconds() << " " << packet->GetSize() << " " << total << std::endl;
@@ -170,7 +170,7 @@ void MyOrchestrator::AssignServer(uint32_t serverIndex, uint32_t nLayer){
           Address nextService = InetSocketAddress(m_p2pHelper.GetParentAddress(nLayer,i,j,m_serverPlace[m_chaine[serverIndex]]),m_sinkPort+m_chaine[serverIndex]);
           std::vector<Ipv4Address> children = m_p2pHelper.GetChildrenAddress(nLayer,i,j,m_p2pHelper.GetNLayers()-1);
           for(Ipv4Address k: children){
-            NS_LOG_DEBUG("MyOrchestrator >> make addrTable "<<InetSocketAddress(k));
+            //NS_LOG_DEBUG("MyOrchestrator >> make addrTable "<<InetSocketAddress(k));
             addrTable[InetSocketAddress(k)] = nextService;
           }
         }
@@ -178,7 +178,7 @@ void MyOrchestrator::AssignServer(uint32_t serverIndex, uint32_t nLayer){
           Address nextService = InetSocketAddress(m_p2pHelper.GetIpv4Address(nLayer,i,j,0),m_sinkPort+m_chaine[serverIndex]);
           std::vector<Ipv4Address> children = m_p2pHelper.GetChildrenAddress(nLayer,i,j,m_p2pHelper.GetNLayers()-1);
           for(Ipv4Address k: children){
-            NS_LOG_DEBUG("MyOrchestrator >> make addrTable "<<InetSocketAddress(k));
+            //NS_LOG_DEBUG("MyOrchestrator >> make addrTable "<<InetSocketAddress(k));
             addrTable[InetSocketAddress(k)] = nextService;
           }
         }
@@ -187,17 +187,18 @@ void MyOrchestrator::AssignServer(uint32_t serverIndex, uint32_t nLayer){
           for(uint32_t k: nextServiceList){
             std::vector<Ipv4Address> children = m_p2pHelper.GetChildrenAddress(k, m_p2pHelper.GetNLayers()-1-m_serverPlace[m_chaine[serverIndex]]);
             for(Ipv4Address l: children){
-              NS_LOG_DEBUG("MyOrchestrator >> make addrTable from "<<InetSocketAddress(m_p2pHelper.GetIpv4Address(k,1))<<" to "<<InetSocketAddress(l));
+              //NS_LOG_DEBUG("MyOrchestrator >> make addrTable from "<<InetSocketAddress(m_p2pHelper.GetIpv4Address(k,1))<<" to "<<InetSocketAddress(l));
               addrTable[InetSocketAddress(l)] = InetSocketAddress(m_p2pHelper.GetIpv4Address(k,1),m_sinkPort+m_chaine[serverIndex]);
             }
           }
         }
         uint32_t nProcess = m_processCount[nLayer];
         std::stringstream meanTime;
-        meanTime << "ns3::ExponentialRandomVariable[Mean=" << m_process[serverIndex][nLayer]/nProcess << "]";
+        meanTime << "ns3::ExponentialRandomVariable[Mean=" << m_process[serverIndex][nLayer]*nProcess << "]";
+        NS_LOG_DEBUG(serverIndex<<":"<<meanTime.str());
         m_serverHelper[serverIndex].SetAttribute("CalcTime", StringValue(meanTime.str()));
         ApplicationContainer servers = m_p2pHelper.InstallApp(m_serverHelper[serverIndex], nLayer, i, j);
-        NS_LOG_DEBUG("address: "<<m_p2pHelper.GetIpv4Address(nLayer,i,j,1)<<" size: "<<addrTable.size());
+        //NS_LOG_DEBUG("address: "<<m_p2pHelper.GetIpv4Address(nLayer,i,j,1)<<" size: "<<addrTable.size());
         servers.Get(0)->GetObject<MyTcpServer>()->SetAddressTable(addrTable);
         servers.Start(Seconds(0.1));
         servers.Stop(Seconds(m_simTime+5));
@@ -205,7 +206,8 @@ void MyOrchestrator::AssignServer(uint32_t serverIndex, uint32_t nLayer){
       else{
         uint32_t nProcess = m_processCount[nLayer];
         std::stringstream meanTime;
-        meanTime << "ns3::ExponentialRandomVariable[Mean=" << m_process[serverIndex][nLayer]/nProcess << "]";
+        meanTime << "ns3::ExponentialRandomVariable[Mean=" << m_process[serverIndex][nLayer]*nProcess << "]";
+        NS_LOG_DEBUG(serverIndex<<":"<<meanTime.str());
         m_serverHelper[serverIndex].SetAttribute("CalcTime", StringValue(meanTime.str()));
         ApplicationContainer servers = m_p2pHelper.InstallApp(m_serverHelper[serverIndex], nLayer, i, j);
         servers.Start(Seconds(0.1));
@@ -257,13 +259,13 @@ uint32_t MyOrchestrator::Factorial(uint32_t m){
 
 void MyOrchestrator::Algorithm(){
   //AssignServer(0,3);
-  AddProcessCount(m_top);
-  AddProcessCount(m_mid);
-  AddProcessCount(m_end);
-  AssignServer(0,m_top);
-  AssignServer(1,m_mid);
-  AssignServer(2,m_end);
-  m_firstServer = m_end;
+  for(auto i: m_place){
+    AddProcessCount(i);
+  }
+  for(size_t i=(m_place.size()-1); i>=0; i--){
+    AssignServer(i,m_place[i]);
+  }
+  m_firstServer = m_place[0];
   AssignClient();
 }
 
@@ -323,10 +325,9 @@ void MyOrchestrator::SetTracer(){
   }
 }
 
-void MyOrchestrator::SetPlace(uint32_t top, uint32_t mid, uint32_t end){
-  m_top = top;
-  m_mid = mid;
-  m_end = end;
+//void MyOrchestrator::SetPlace(uint32_t top, uint32_t mid, uint32_t end){
+void MyOrchestrator::SetPlace(std::vector<uint32_t> place){
+  m_place = place;
 }
 
 void MyOrchestrator::SetPath(std::string path){

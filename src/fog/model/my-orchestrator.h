@@ -56,9 +56,7 @@ private:
   std::string m_clientDataRate;
   uint32_t m_firstServer;
 
-  uint32_t m_top;
-  uint32_t m_mid;
-  uint32_t m_end;
+  std::vector<uint32_t> m_place;
 
   std::vector<std::vector<double>> m_process;
 
@@ -73,7 +71,7 @@ public:
   void SetSinkPort(int port);
   void SetClientOffTime(std::string offtime);
   void SetClientPktSize(uint32_t pktSize);
-  void SetPlace(uint32_t top, uint32_t mid, uint32_t end);
+  void SetPlace(std::vector<uint32_t> place);
   void SetPath(std::string path);
 
 private:

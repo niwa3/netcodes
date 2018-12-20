@@ -162,7 +162,7 @@ PointToPointTreeHelper::InstallStack (InternetStackHelper stack)
 void 
 PointToPointTreeHelper::AssignIpv4Addresses (Ipv4AddressHelper address)
 {
-  std::ofstream ifs("/root/result/1215/10MNet/myNodeList.csv");
+  std::ofstream ifs("/root/result/1219/alg/myNodeList.csv");
   ifs<<"fromN fromA toN toA"<<std::endl;
 
   for(size_t nLayer=0; nLayer<(GetNLayers()-1); nLayer++){
